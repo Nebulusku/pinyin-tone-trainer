@@ -1,5 +1,6 @@
 /* Pre-renders all lesson audio with macOS voices. Run from the app folder: node tools/build_audio.js
-   Needs: macOS `say` with Tingting + Eddy (Chinese, China mainland) voices, and ffmpeg. */
+   Needs: macOS `say` with the Tingting voice, and ffmpeg. Only Tingting can be rendered to a file on macOS,
+   so Person 2 is Tingting shifted ~4 semitones lower (tone shapes are preserved). */
 const fs = require("fs"), path = require("path"), vm = require("vm"), crypto = require("crypto");
 const { execFileSync } = require("child_process");
 
@@ -9,7 +10,8 @@ vm.createContext(ctx);
 const src = ["lessons.js", "tone-engine.js"].map(f => fs.readFileSync(path.join(root, f), "utf8")).join("\n");
 vm.runInContext(src + "\nthis.LESSONS = LESSONS; this.parsePinyin = parsePinyin;", ctx);
 
-const VOICE = { A: "Tingting", B: "Eddy" };
+const VOICE = { A: "Tingting", B: "TingtingLow" };
+const FILTER = { Tingting: [], TingtingLow: ["-af", "asetrate=22050*0.79,aresample=22050,atempo=1.266"] };
 const jobs = new Map();
 const add = (voice, text) => jobs.set(`${voice}|${text}`, { voice, text });
 
@@ -39,8 +41,9 @@ for (const [key, { voice, text }] of jobs) {
   manifest[key] = file;
   const dest = path.join(outDir, file);
   if (fs.existsSync(dest)) continue;
-  execFileSync("say", ["-v", voice, "-o", tmp, text]);
-  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", tmp, "-ac", "1", "-c:a", "aac", "-b:a", "40k", dest]);
+  execFileSync("say", ["-v", "Tingting", "-o", tmp, text]);
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", tmp, ...FILTER[voice], "-ac", "1", "-c:a", "aac", "-b:a", "40k", dest]);
+  if (fs.statSync(dest).size < 2000) throw new Error(`Silent clip for "${text}" (${voice}) — check the Tingting voice is installed`);
   made++;
 }
 if (fs.existsSync(tmp)) fs.unlinkSync(tmp);

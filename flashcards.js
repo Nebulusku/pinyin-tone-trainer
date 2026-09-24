@@ -47,21 +47,58 @@ function fcShow() {
   const card = practiceCard(item, {});
   card.el.classList.add("fc", dir === "en" ? "hide-py" : "hide-en");
   card.el.insertAdjacentHTML("afterbegin",
-    `<p class="note fc-prompt">${dir === "en" ? "Say it in Chinese, then flip the card." : "What does it mean? Say it out loud, then flip."}</p>`);
+    `<p class="note fc-prompt">${dir === "en" ? "Say it in Chinese from memory — record your answer, then flip to check." : "What does it mean? Read it aloud (you can record it), then flip."}</p>`);
   const flip = document.createElement("div");
   flip.className = "actions fc-controls";
-  flip.innerHTML = `<button class="primary fc-flip">Show answer</button>`;
+  flip.innerHTML = `<button class="fc-rec">🎙 Record my answer</button><span class="fc-status note"></span>
+    <button class="primary fc-flip">Show answer</button>`;
   card.el.appendChild(flip);
-  $(".fc-flip", flip).onclick = () => {
+  let answer = null, rec = null;
+  const recBtn = $(".fc-rec", flip), status = $(".fc-status", flip);
+  recBtn.onclick = async () => {
+    if (rec) return rec.stop();
+    stopSpeech();
+    try { await Mic.init(); } catch (e) { status.textContent = e.message || "Microphone permission was denied."; return; }
+    rec = Mic.record({ maxMs: 3000 + card.parsed.syls.length * 700 });
+    recBtn.classList.add("on");
+    recBtn.textContent = "⏹ Stop";
+    status.textContent = "Listening…";
+    const r = await rec.done;
+    Mic.releaseOnMobile();
+    rec = null;
+    recBtn.classList.remove("on");
+    answer = r.heard ? r : null;
+    recBtn.textContent = answer ? "🎙 Record again" : "🎙 Record my answer";
+    status.textContent = answer ? "✓ Answer recorded — flip to check it" : "Didn't hear anything — try again.";
+  };
+  $(".fc-flip", flip).onclick = async () => {
+    if (rec) { const r = rec; r.stop(); await r.done; } // the record handler stores the answer first
     card.el.classList.remove("hide-py", "hide-en");
-    $(".fc-prompt", card.el).textContent = "Listen, repeat, then rate yourself:";
+    $(".fc-prompt", card.el).textContent = answer ? "Here's how you did — compare, then rate yourself:" : "Listen, repeat, then rate yourself:";
+    if (answer) {
+      renderResult($(".result", card.el), card.parsed, analyzeUtterance(answer.samples, answer.sr, card.parsed, state.cal));
+      $(".play", card.el).insertAdjacentHTML("afterend", `<button class="fc-mine">▶ My answer</button>`);
+      $(".fc-mine", card.el).onclick = () => playRecording(answer);
+    }
     speak(item.zh);
     flip.innerHTML = `<button class="fc-rate" data-r="again">😕 Again</button>
       <button class="fc-rate" data-r="good">🙂 Good</button><button class="fc-rate" data-r="easy">😎 Easy</button>`;
     flip.querySelectorAll(".fc-rate").forEach(b => (b.onclick = () => fcRate(item, b.dataset.r)));
   };
   box.appendChild(card.el);
-  if (dir === "py") speak(item.zh);
+}
+
+/* Plays back a raw recording so you can compare it with the native audio. */
+async function playRecording({ samples, sr }) {
+  stopSpeech();
+  if (!Mic.ctx) Mic.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (Mic.ctx.state === "suspended") await Mic.ctx.resume();
+  const buf = Mic.ctx.createBuffer(1, samples.length, sr);
+  buf.copyToChannel(samples, 0);
+  const src = Mic.ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(Mic.ctx.destination);
+  src.start();
 }
 
 function fcRate(item, r) {

@@ -33,7 +33,7 @@ const voiceFor = who => {
   return other ? { voice: other, pitch: 1 } : { voice: main, pitch: 0.75 };
 };
 /* Pre-rendered clips (audio/manifest.js) are used when available; browser speech is the fallback. */
-const CLIP_VOICE = { A: "Tingting", B: "Eddy" };
+const CLIP_VOICE = { A: "Tingting", B: "TingtingLow" };
 const player = new Audio();
 player.preservesPitch = player.webkitPreservesPitch = true;
 const SILENCE = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=";
