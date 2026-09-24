@@ -7,12 +7,14 @@ const Auth = (() => {
   const hex = buf => [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, "0")).join("");
   const $ = s => document.querySelector(s);
   const cfg = () => window.LOGIN;
+  /* Must match normalize() in tools/set-login.js: phone keyboards turn quotes/dashes "smart". */
+  const normalize = s => s.normalize("NFC").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-");
 
   async function derive(user, pw, { salt, iterations }) {
     const enc = new TextEncoder();
-    const key = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveBits"]);
+    const key = await crypto.subtle.importKey("raw", enc.encode(normalize(pw)), "PBKDF2", false, ["deriveBits"]);
     const bits = await crypto.subtle.deriveBits(
-      { name: "PBKDF2", salt: enc.encode(`${salt}|${user.trim().toLowerCase()}`), iterations, hash: "SHA-256" }, key, 256);
+      { name: "PBKDF2", salt: enc.encode(`${salt}|${normalize(user.trim()).toLowerCase()}`), iterations, hash: "SHA-256" }, key, 256);
     return hex(bits);
   }
 
@@ -62,6 +64,7 @@ const Auth = (() => {
       return;
     }
     $("#lockForm").onsubmit = submit;
+    $("#lockShow").onchange = e => ($("#lockPass").type = e.target.checked ? "text" : "password");
     if (isUnlocked()) $("#lock").hidden = true;
   }
 

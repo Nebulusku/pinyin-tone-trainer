@@ -101,8 +101,9 @@ body.show-zh .zh { display: block; }
   <form id="lockForm" autocomplete="on">
     <h2>拼音 Tone Trainer</h2>
     <strong id="lockTitle">Sign in</strong>
-    <input type="text" id="lockUser" name="username" autocomplete="username" placeholder="Username" autocapitalize="none">
-    <input type="password" id="lockPass" name="password" autocomplete="current-password" placeholder="Password">
+    <input type="text" id="lockUser" name="username" autocomplete="username" placeholder="Username" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <input type="password" id="lockPass" name="password" autocomplete="current-password" placeholder="Password" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <label class="row"><input type="checkbox" id="lockShow"> Show password</label>
     <label class="row"><input type="checkbox" id="lockRemember" checked> Stay signed in for 30 days</label>
     <button class="primary" id="lockBtn" type="submit">Sign in</button>
     <p class="note" id="lockMsg" role="alert"></p>
