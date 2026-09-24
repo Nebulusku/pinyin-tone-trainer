@@ -35,6 +35,21 @@ function parsePinyin(py) {
   return { words, syls };
 }
 
+/* Splits hanzi into one string per syllable; an erhua syllable (nǎr) also takes the following 儿.
+   Returns null when the characters don't line up with the pinyin. */
+function syllableChars(zh, parsed) {
+  const chars = [...zh.replace(/[\p{P}\s]/gu, "")], out = [];
+  let i = 0;
+  for (const s of parsed.syls) {
+    if (i >= chars.length) return null;
+    let c = chars[i++];
+    const plain = s.text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    if (plain.endsWith("r") && plain !== "er" && chars[i] === "儿") c += chars[i++];
+    out.push(c);
+  }
+  return i === chars.length ? out : null;
+}
+
 /* ---------- Microphone ---------- */
 const Mic = {
   ctx: null,

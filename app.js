@@ -87,8 +87,8 @@ let activeRec = null;
 
 function practiceCard(item, { id, who, isMe } = {}) {
   const parsed = parsePinyin(item.py);
-  const chars = [...item.zh.replace(/[\p{P}\s]/gu, "")];
-  if (chars.length !== parsed.syls.length) console.warn("Hanzi/pinyin mismatch:", item.zh, item.py);
+  const chars = syllableChars(item.zh, parsed);
+  if (!chars) console.warn("Hanzi/pinyin mismatch:", item.zh, item.py);
   const el = document.createElement("div");
   el.className = "card";
   const pyHtml = parsed.words.map((w, wi) =>
@@ -111,7 +111,7 @@ function practiceCard(item, { id, who, isMe } = {}) {
     wEl.onclick = () => {
       const syls = parsed.words[+wEl.dataset.w].syls;
       if (!syls.length) return;
-      const text = chars.length === parsed.syls.length ? chars.slice(syls[0].idx, syls[syls.length - 1].idx + 1).join("") : item.zh;
+      const text = chars ? chars.slice(syls[0].idx, syls[syls.length - 1].idx + 1).join("") : item.zh;
       speak(text, { who, rate: Math.min(settings.rate, 0.7) });
     };
   });
@@ -161,6 +161,10 @@ const ORD = { 1: "1st", 2: "2nd", 3: "3rd", 4: "4th" };
 /* hideText: flashcard front — grade tones without revealing the pinyin. */
 function renderResult(box, parsed, res, { hideText } = {}) {
   if (res.error) { box.innerHTML = `<p class="err">${res.error}</p>`; return; }
+  if (!res.total) {
+    box.innerHTML = `<p class="note">Neutral tone — say it short and light. Nothing to grade here.</p>`;
+    return;
+  }
   const cls = res.score >= 75 ? "good" : res.score < 50 ? "bad" : "";
   const wrong = res.results.filter(r => r.ok === false).slice(0, 4).map(r => {
     const target = r.syl.sandhi ? "2nd (tone change)" : ORD[r.syl.tone];
@@ -223,9 +227,15 @@ let lineCards = [];
 function renderDay() {
   stopDialog();
   if (day > (state.maxDay || 0)) { state.maxDay = day; save(); }
-  const L = LESSONS[day];
-  $("#dayLabel").textContent = `Day ${day + 1} of ${LESSONS.length}${day === todayIndex() ? " · today" : ""}`;
+  const L = LESSONS[day], course = L.course || "Starter";
+  const num = LESSONS.slice(0, day + 1).filter(x => (x.course || "Starter") === course).length;
+  $("#dayLabel").textContent = `${course} · lesson ${num}${day === todayIndex() ? " · today" : ""}`;
   $("#dayTitle").textContent = L.title;
+  $("#lessonPick").value = day;
+  const wb = $("#words"), words = L.words || [];
+  wb.innerHTML = "";
+  $("#wordsH").hidden = !words.length;
+  words.forEach((w, i) => { const c = practiceCard(w, { id: `d${day}-w${i}` }); c.el.classList.add("word"); wb.appendChild(c.el); });
   const ph = $("#phrases");
   ph.innerHTML = "";
   L.phrases.forEach((p, i) => ph.appendChild(practiceCard(p, { id: `d${day}-p${i}` }).el));
@@ -316,6 +326,8 @@ function setupCalibration() {
 }
 
 /* ---------- Wiring ---------- */
+$("#lessonPick").innerHTML = LESSONS.map((L, i) => `<option value="${i}">${L.course || "Starter"} · ${L.title}</option>`).join("");
+$("#lessonPick").onchange = e => { day = +e.target.value; renderDay(); };
 $("#prevDay").onclick = () => { day = (day - 1 + LESSONS.length) % LESSONS.length; renderDay(); };
 $("#nextDay").onclick = () => { day = (day + 1) % LESSONS.length; renderDay(); };
 $("#rate").value = settings.rate;

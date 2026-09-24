@@ -79,6 +79,11 @@ body.show-zh .zh { display: block; }
 .tabs { display: flex; gap: 8px; margin: 0 0 12px; align-items: center; }
 .tabs button.sel { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .tabs #signOut { margin-left: auto; font-size: .8rem; padding: 4px 10px; color: var(--muted); }
+.pick { text-align: center; margin-bottom: 6px; }
+.pick select { font: inherit; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); max-width: 100%; }
+.words { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.words .card { margin: 0; padding: 12px; }
+.words .py { font-size: 1.5rem; }
 .fc .fc-prompt { margin: 0 0 6px; }
 .fc.hide-py .py, .fc.hide-py .zh, .fc.hide-py .actions:not(.fc-controls), .fc.hide-py .result { display: none; }
 .fc.hide-py .en { font-size: 1.6rem; font-style: normal; color: var(--ink); font-weight: 600; }
@@ -154,6 +159,7 @@ body.show-zh .zh { display: block; }
     <h2><span class="day" id="dayLabel"></span><span id="dayTitle"></span></h2>
     <button id="nextDay" aria-label="Next day">›</button>
   </div>
+  <div class="pick"><select id="lessonPick" aria-label="Jump to lesson"></select></div>
   <div class="legend">
     <span><b class="s t1">ā</b> 1st high &amp; flat</span>
     <span><b class="s t2">á</b> 2nd rising</span>
@@ -162,6 +168,9 @@ body.show-zh .zh { display: block; }
     <span><b class="s t5">a</b> neutral (short, not graded)</span>
     <span><b class="s t3 sandhi">ǎ</b> 3rd before 3rd → say it as 2nd</span>
   </div>
+
+  <h3 id="wordsH">HSK vocabulary</h3>
+  <div id="words" class="words"></div>
 
   <h3>Key phrases</h3>
   <div id="phrases"></div>
@@ -186,6 +195,7 @@ body.show-zh .zh { display: block; }
 <script src="login.js"></script>
 <script src="auth.js"></script>
 <script src="lessons.js"></script>
+<script src="lessons-hsk1.js"></script>
 <script src="audio/manifest.js"></script>
 <script src="tone-engine.js"></script>
 <script src="app.js"></script>

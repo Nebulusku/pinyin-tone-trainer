@@ -7,8 +7,8 @@ const { execFileSync } = require("child_process");
 const root = path.join(__dirname, "..");
 const ctx = { console };
 vm.createContext(ctx);
-const src = ["lessons.js", "tone-engine.js"].map(f => fs.readFileSync(path.join(root, f), "utf8")).join("\n");
-vm.runInContext(src + "\nthis.LESSONS = LESSONS; this.parsePinyin = parsePinyin;", ctx);
+const src = ["lessons.js", "lessons-hsk1.js", "tone-engine.js"].map(f => fs.readFileSync(path.join(root, f), "utf8")).join("\n");
+vm.runInContext(src + "\nthis.LESSONS = LESSONS; this.parsePinyin = parsePinyin; this.syllableChars = syllableChars;", ctx);
 
 const VOICE = { A: "Tingting", B: "TingtingLow" };
 const FILTER = { Tingting: [], TingtingLow: ["-af", "asetrate=22050*0.79,aresample=22050,atempo=1.266"] };
@@ -18,8 +18,8 @@ const add = (voice, text) => jobs.set(`${voice}|${text}`, { voice, text });
 function addItem(item, who) {
   const voice = VOICE[who === "B" ? "B" : "A"];
   add(voice, item.zh);
-  const parsed = ctx.parsePinyin(item.py), chars = [...item.zh.replace(/[\p{P}\s]/gu, "")];
-  if (chars.length !== parsed.syls.length) { console.warn("mismatch:", item.zh); return; }
+  const parsed = ctx.parsePinyin(item.py), chars = ctx.syllableChars(item.zh, parsed);
+  if (!chars) { console.warn("mismatch:", item.zh); return; }
   for (const w of parsed.words) {
     if (!w.syls.length) continue;
     add(voice, chars.slice(w.syls[0].idx, w.syls[w.syls.length - 1].idx + 1).join(""));
@@ -27,6 +27,7 @@ function addItem(item, who) {
 }
 
 ctx.LESSONS.forEach(L => {
+  (L.words || []).forEach(w => addItem(w));
   L.phrases.forEach(p => addItem(p));
   L.dialog.lines.forEach(l => addItem(l, l.who));
 });

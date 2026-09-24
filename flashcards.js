@@ -5,10 +5,10 @@ let fcSession = [], fcDone = 0;
 
 const addDays = (d, n) => { const x = new Date(d + "T12:00:00"); x.setDate(x.getDate() + n); return dayStr(x); };
 
-/* All phrases + dialogue lines from lessons up to the furthest day reached, without duplicates. */
+/* All words, phrases + dialogue lines from lessons up to the furthest day reached, without duplicates. */
 function fcDeck() {
   const upto = Math.max(state.maxDay || 0, todayIndex()), seen = new Set(), deck = [];
-  LESSONS.slice(0, upto + 1).forEach(L => [...L.phrases, ...L.dialog.lines].forEach(it => {
+  LESSONS.slice(0, upto + 1).forEach(L => [...(L.words || []), ...L.phrases, ...L.dialog.lines].forEach(it => {
     if (!seen.has(it.zh)) { seen.add(it.zh); deck.push(it); }
   }));
   return deck;
