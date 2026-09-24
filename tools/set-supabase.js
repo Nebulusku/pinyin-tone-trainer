@@ -1,4 +1,4 @@
-/* Connects the app to your Supabase project. Run from the app folder:  node tools/set-supabase.js
+/* Connects the app to your Supabase project. Run from the app folder:  node tools/set-supabase.js [project-id] [key]
    Asks for the Project URL and the publishable (anon) key — both are meant to be public; the
    database is protected by row-level security (tools/supabase-setup.sql).
    Writes supabase-config.js, removes the old login.js hash, then commits and pushes. */
@@ -6,13 +6,18 @@ const fs = require("fs"), path = require("path"), readline = require("readline")
 const { execFileSync } = require("child_process");
 
 const root = path.join(__dirname, "..");
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-const ask = q => new Promise(r => rl.question(q, a => r(a.trim())));
+const args = process.argv.slice(2).filter(a => !a.startsWith("--"));
+let rl = null;
+const ask = (q, i) => args[i] ? Promise.resolve(args[i].trim())
+  : new Promise(r => (rl = rl || readline.createInterface({ input: process.stdin, output: process.stdout })).question(q, a => r(a.trim())));
 
 (async () => {
-  const url = (await ask("Supabase Project URL (https://xxxx.supabase.co): ")).replace(/\/+$/, "");
-  const anonKey = await ask("Publishable / anon key: ");
-  rl.close();
+  // Accepts the project URL, the bare project ID, or a dashboard link containing /project/<id>
+  const raw = await ask("Supabase project ID or URL: ", 0);
+  const id = (raw.match(/\/project\/([a-z0-9]{20})/) || raw.match(/^https:\/\/([a-z0-9]{20})\.supabase\.co/) || raw.match(/^([a-z0-9]{20})$/) || [])[1];
+  const url = id ? `https://${id}.supabase.co` : raw.replace(/\/+$/, "");
+  const anonKey = await ask("Publishable / anon key: ", 1);
+  if (rl) rl.close();
   if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)) { console.error("That doesn't look like a Supabase project URL."); process.exit(1); }
   if (/^sb_secret_/.test(anonKey) || /service_role/.test(Buffer.from(anonKey.split(".")[1] || "", "base64").toString())) {
     console.error("That's the SECRET key — never publish it. Use the publishable (anon) key instead.");
