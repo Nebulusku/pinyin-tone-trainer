@@ -103,12 +103,9 @@ body.show-zh .zh { display: block; }
     <strong id="lockTitle">Sign in</strong>
     <input type="text" id="lockUser" name="username" autocomplete="username" placeholder="Username" autocapitalize="none">
     <input type="password" id="lockPass" name="password" autocomplete="current-password" placeholder="Password">
-    <input type="password" id="lockPass2" autocomplete="new-password" placeholder="Repeat password" hidden>
     <label class="row"><input type="checkbox" id="lockRemember" checked> Stay signed in for 30 days</label>
     <button class="primary" id="lockBtn" type="submit">Sign in</button>
     <p class="note" id="lockMsg" role="alert"></p>
-    <p class="note" id="lockHint"></p>
-    <button type="button" class="linkish" id="lockReset">Forgot it? Reset this device</button>
   </form>
 </div>
 <div class="wrap">
@@ -184,6 +181,7 @@ body.show-zh .zh { display: block; }
   <p class="note">Tone checking is a coach, not a judge — it works best on short phrases spoken clearly. Allow the microphone when asked. Headphones help in dialogue mode.</p>
 </div>
 
+<script src="login.js"></script>
 <script src="auth.js"></script>
 <script src="lessons.js"></script>
 <script src="audio/manifest.js"></script>

@@ -1,11 +1,11 @@
 /* Offline cache: app files load fresh when online (cache is the offline fallback); audio clips are cached permanently. */
-const VERSION = "ptt-v3";
-const SHELL = ["./", "index.html", "app.js", "auth.js", "flashcards.js", "tone-engine.js", "lessons.js", "audio/manifest.js", "manifest.webmanifest", "icons/icon-192.png"];
+const VERSION = "ptt-v4";
+const SHELL = ["./", "index.html", "app.js", "login.js", "auth.js", "flashcards.js", "tone-engine.js", "lessons.js", "audio/manifest.js", "manifest.webmanifest", "icons/icon-192.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil((async () => {
     const cache = await caches.open(VERSION);
-    await cache.addAll(SHELL);
+    await Promise.all(SHELL.map(u => cache.add(u).catch(() => {})));
     importScripts("audio/manifest.js");
     await cache.addAll([...new Set(Object.values(AUDIO_FILES))].map(f => "audio/" + f)).catch(() => {});
     self.skipWaiting();
