@@ -36,7 +36,10 @@ const Sync = (() => {
 
   async function rest(path, opts = {}) {
     const r = await fetch(`${cfg().url}/rest/v1/${path}`, Object.assign({}, opts, { headers: headers(Object.assign({ Authorization: `Bearer ${await token()}` }, opts.headers)) }));
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw new Error(`${r.status} ${j.code || ""} ${j.message || j.msg || ""}`.trim());
+    }
     return r.status === 204 || r.status === 201 ? null : r.json();
   }
 
@@ -55,7 +58,8 @@ const Sync = (() => {
       });
       setStatus(`☁️ synced ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
     } catch (e) {
-      setStatus("☁️ sync failed — will retry");
+      console.error("Sync failed:", e);
+      setStatus(`☁️ sync failed (${String(e.message || e).slice(0, 90)})`);
     }
     busy = false;
     if (again) { again = false; schedule(); }
