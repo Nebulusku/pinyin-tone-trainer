@@ -40,7 +40,8 @@ const Sync = (() => {
       const j = await r.json().catch(() => ({}));
       throw new Error(`${r.status} ${j.code || ""} ${j.message || j.msg || ""}`.trim());
     }
-    return r.status === 204 || r.status === 201 ? null : r.json();
+    const text = await r.text(); // an upsert that updates an existing row answers 200 with an empty body
+    return text ? JSON.parse(text) : null;
   }
 
   async function run() {
