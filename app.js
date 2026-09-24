@@ -5,7 +5,33 @@ const STORE = "pinyin-tone-trainer-v1";
 
 let state = {};
 try { state = JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) {}
-const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} };
+const save = () => {
+  try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {}
+  if (typeof Sync !== "undefined") Sync.schedule();
+};
+
+/* Progress that syncs between devices (settings like speed stay per device). */
+const exportState = () => {
+  const { best, cards, maxDay, startDate, streak, lastPractice, cal } = state;
+  return { best, cards, maxDay, startDate, streak, lastPractice, cal };
+};
+/* Combines progress from another device: best scores max, flashcards by latest review, streak by latest day. */
+function mergeState(r) {
+  if (!r) return;
+  for (const [k, v] of Object.entries(r.best || {})) state.best[k] = Math.max(state.best[k] || 0, v);
+  state.cards = state.cards || {};
+  for (const [k, v] of Object.entries(r.cards || {})) {
+    const l = state.cards[k];
+    if (!l || (v.t || 0) > (l.t || 0)) state.cards[k] = v;
+  }
+  state.maxDay = Math.max(state.maxDay || 0, r.maxDay || 0);
+  if (r.startDate && r.startDate < state.startDate) state.startDate = r.startDate;
+  if ((r.lastPractice || "") > (state.lastPractice || "")) { state.lastPractice = r.lastPractice; state.streak = r.streak; }
+  else if (r.lastPractice === state.lastPractice) state.streak = Math.max(state.streak || 0, r.streak || 0);
+  if (r.cal && (!state.cal || (r.cal.t || 0) > (state.cal.t || 0))) state.cal = r.cal;
+  try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {}
+  if (typeof onRemoteMerge === "function") onRemoteMerge();
+}
 const dayStr = (d = new Date()) => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 state.best = state.best || {};
 state.startDate = state.startDate || dayStr();
@@ -318,7 +344,7 @@ function setupCalibration() {
     btn.classList.remove("on"); btn.textContent = "🎙 Record"; card.el.classList.remove("recording");
     const cal = calibrate(samples, sr);
     if (!cal) { box.innerHTML = `<p class="err">Not enough voice heard — try again a bit louder.</p>`; return; }
-    state.cal = cal;
+    state.cal = Object.assign(cal, { t: Date.now() });
     save();
     status();
     renderResult(box, card.parsed, analyzeUtterance(samples, sr, card.parsed, cal));
@@ -339,6 +365,12 @@ $("#voice").onchange = e => { settings.voice = e.target.value; save(); };
 $("#calBtn").onclick = () => $("#calPanel").classList.toggle("open");
 document.querySelectorAll("#roleSeg button").forEach(b => (b.onclick = () => { stopDialog(); settings.role = b.dataset.role; save(); renderLines(); }));
 $("#runDialog").onclick = runDialog;
+/* After a sync brings in progress from another device, refresh what's on screen (unless mid-dialogue). */
+function onRemoteMerge() {
+  showStreak();
+  if (!dialogRun && !$("#tab-lesson").hidden) renderDay();
+  if (fcStarted) $("#fcCount").textContent = fcStats();
+}
 let fcStarted = false;
 document.querySelectorAll(".tabs [data-tab]").forEach(b => (b.onclick = () => {
   stopDialog();

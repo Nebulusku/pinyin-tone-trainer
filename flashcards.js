@@ -113,6 +113,7 @@ function fcRate(item, r) {
   const today = dayStr(), s = state.cards[item.zh] || { box: 0 };
   s.box = r === "again" ? 0 : Math.min(FC_INTERVALS.length - 1, s.box + (r === "easy" ? 2 : 1));
   s.due = addDays(today, FC_INTERVALS[s.box]);
+  s.t = Date.now();
   state.cards[item.zh] = s;
   fcSession.shift();
   if (r === "again") fcSession.splice(Math.min(3, fcSession.length), 0, item);

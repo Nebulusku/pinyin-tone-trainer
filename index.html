@@ -78,7 +78,8 @@ body.show-zh .zh { display: block; }
 .note { font-size: .85rem; color: var(--muted); }
 .tabs { display: flex; gap: 8px; margin: 0 0 12px; align-items: center; }
 .tabs button.sel { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.tabs #signOut { margin-left: auto; font-size: .8rem; padding: 4px 10px; color: var(--muted); }
+.tabs #syncStatus { margin-left: auto; font-size: .75rem; }
+.tabs #signOut { margin-left: 0; font-size: .8rem; padding: 4px 10px; color: var(--muted); }
 .pick { text-align: center; margin-bottom: 6px; }
 .pick select { font: inherit; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); max-width: 100%; }
 .words { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
@@ -124,6 +125,7 @@ body.show-zh .zh { display: block; }
   <nav class="tabs">
     <button data-tab="lesson" class="sel">📘 Lesson</button>
     <button data-tab="cards">🃏 Cards</button>
+    <span class="note" id="syncStatus"></span>
     <button id="signOut">Sign out</button>
   </nav>
 
@@ -192,14 +194,16 @@ body.show-zh .zh { display: block; }
   <p class="note">Tone checking is a coach, not a judge — it works best on short phrases spoken clearly. Allow the microphone when asked. Headphones help in dialogue mode.</p>
 </div>
 
+<script src="supabase-config.js"></script>
 <script src="login.js"></script>
-<script src="auth.js"></script>
 <script src="lessons.js"></script>
 <script src="lessons-hsk1.js"></script>
 <script src="audio/manifest.js"></script>
 <script src="tone-engine.js"></script>
 <script src="app.js"></script>
 <script src="flashcards.js"></script>
+<script src="sync.js"></script>
+<script src="auth.js"></script>
 <script>if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js");</script>
 </body>
 </html>

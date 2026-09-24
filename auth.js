@@ -1,5 +1,6 @@
-/* Login gate. Credentials are set on the Mac with `node tools/set-login.js`, which publishes only a
-   salted PBKDF2 hash (login.js). Every login is checked against that hash in the browser. */
+/* Login gate, two modes:
+   - Cloud (supabase-config.js present): email + password checked by Supabase; progress syncs (sync.js).
+   - Local hash (login.js from tools/set-login.js): salted PBKDF2 hash checked in the browser; no sync. */
 const Auth = (() => {
   const REMEMBER = "ptt-remember", SESSION = "ptt-session";
   const get = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
@@ -25,7 +26,7 @@ const Auth = (() => {
     try { return sessionStorage.getItem(SESSION) === cfg().hash; } catch (e) { return false; }
   }
 
-  function unlock(remember) {
+  function unlockLocal(remember) {
     try { sessionStorage.setItem(SESSION, cfg().hash); } catch (e) {}
     set(REMEMBER, remember ? { until: Date.now() + 30 * 864e5, hash: cfg().hash } : null);
     $("#lock").hidden = true;
@@ -35,18 +36,25 @@ const Auth = (() => {
     e.preventDefault();
     const user = $("#lockUser").value, pw = $("#lockPass").value, msg = $("#lockMsg"), btn = $("#lockBtn");
     msg.textContent = "";
-    if (!user.trim() || !pw) { msg.textContent = "Enter your username and password."; return; }
+    if (!user.trim() || !pw) { msg.textContent = "Enter your login and password."; return; }
     btn.disabled = true;
     btn.textContent = "Checking…";
-    const ok = (await derive(user, pw, cfg())) === cfg().hash;
+    let error = null;
+    if (Sync.enabled()) {
+      try { await Sync.signIn(user, pw); } catch (err) {
+        error = !navigator.onLine ? "You're offline — the first sign-in needs internet."
+          : err.status === 400 ? "Wrong email or password." : `Sign-in failed (${err.message}).`;
+      }
+    } else if ((await derive(user, pw, cfg())) !== cfg().hash) error = "Wrong username or password.";
     btn.disabled = false;
     btn.textContent = "Sign in";
-    if (ok) return unlock($("#lockRemember").checked);
-    $("#lockPass").value = "";
-    msg.textContent = "Wrong username or password.";
+    if (error) { $("#lockPass").value = ""; msg.textContent = error; return; }
+    if (Sync.enabled()) { $("#lock").hidden = true; Sync.start(); }
+    else unlockLocal($("#lockRemember").checked);
   }
 
   function signOut() {
+    if (Sync.enabled()) return Sync.signOut();
     set(REMEMBER, null);
     try { sessionStorage.removeItem(SESSION); } catch (e) {}
     location.reload();
@@ -54,6 +62,15 @@ const Auth = (() => {
 
   function init() {
     $("#signOut").onclick = signOut;
+    $("#lockShow").onchange = e => ($("#lockPass").type = e.target.checked ? "text" : "password");
+    $("#lockForm").onsubmit = submit;
+    if (Sync.enabled()) {
+      $("#lockUser").type = "email";
+      $("#lockUser").placeholder = "Email";
+      $("#lockRemember").parentElement.hidden = true; // cloud sessions renew themselves
+      if (Sync.signedIn()) { $("#lock").hidden = true; Sync.start(); }
+      return;
+    }
     if (!cfg()) {
       $("#lockForm").innerHTML = `<h2>拼音 Tone Trainer</h2><p class="note">No login has been set up yet. On the Mac, run <code>node tools/set-login.js</code> in the app folder.</p>`;
       return;
@@ -63,8 +80,6 @@ const Auth = (() => {
       $("#lockBtn").disabled = true;
       return;
     }
-    $("#lockForm").onsubmit = submit;
-    $("#lockShow").onchange = e => ($("#lockPass").type = e.target.checked ? "text" : "password");
     if (isUnlocked()) $("#lock").hidden = true;
   }
 
