@@ -53,6 +53,9 @@ function fcShow() {
   flip.innerHTML = `<button class="fc-rec">🎙 Record my answer</button><span class="fc-status note"></span>
     <button class="primary fc-flip">Show answer</button>`;
   card.el.appendChild(flip);
+  const front = document.createElement("div");
+  front.className = "fc-front-result";
+  card.el.appendChild(front);
   let answer = null, rec = null;
   const recBtn = $(".fc-rec", flip), status = $(".fc-status", flip);
   recBtn.onclick = async () => {
@@ -69,14 +72,19 @@ function fcShow() {
     recBtn.classList.remove("on");
     answer = r.heard ? r : null;
     recBtn.textContent = answer ? "🎙 Record again" : "🎙 Record my answer";
-    status.textContent = answer ? "✓ Answer recorded — flip to check it" : "Didn't hear anything — try again.";
+    status.textContent = answer ? "Tone check below — flip to see if you had the right words." : "Didn't hear anything — try again.";
+    if (answer) {
+      answer.res = analyzeUtterance(answer.samples, answer.sr, card.parsed, state.cal);
+      renderResult(front, card.parsed, answer.res, { hideText: true });
+    } else front.innerHTML = "";
   };
   $(".fc-flip", flip).onclick = async () => {
     if (rec) { const r = rec; r.stop(); await r.done; } // the record handler stores the answer first
     card.el.classList.remove("hide-py", "hide-en");
+    front.remove();
     $(".fc-prompt", card.el).textContent = answer ? "Here's how you did — compare, then rate yourself:" : "Listen, repeat, then rate yourself:";
     if (answer) {
-      renderResult($(".result", card.el), card.parsed, analyzeUtterance(answer.samples, answer.sr, card.parsed, state.cal));
+      renderResult($(".result", card.el), card.parsed, answer.res);
       $(".play", card.el).insertAdjacentHTML("afterend", `<button class="fc-mine">▶ My answer</button>`);
       $(".fc-mine", card.el).onclick = () => playRecording(answer);
     }

@@ -158,21 +158,22 @@ const TIPS = {
 const HEARD = { 1: "high & flat", 2: "rising", 3: "low / dipping", 4: "falling" };
 const ORD = { 1: "1st", 2: "2nd", 3: "3rd", 4: "4th" };
 
-function renderResult(box, parsed, res) {
+/* hideText: flashcard front — grade tones without revealing the pinyin. */
+function renderResult(box, parsed, res, { hideText } = {}) {
   if (res.error) { box.innerHTML = `<p class="err">${res.error}</p>`; return; }
   const cls = res.score >= 75 ? "good" : res.score < 50 ? "bad" : "";
   const wrong = res.results.filter(r => r.ok === false).slice(0, 4).map(r => {
     const target = r.syl.sandhi ? "2nd (tone change)" : ORD[r.syl.tone];
     const heard = r.heard ? `sounded ${HEARD[r.got]}` : "not heard clearly";
     const tip = TIPS[r.syl.sandhi ? 2 : r.syl.tone];
-    return `<li><b class="s t${r.syl.tone}">${r.syl.text}</b> — should be ${target}; ${heard}. Tip: ${tip}.</li>`;
+    return `<li><b class="s t${r.syl.tone}">${hideText ? `Syllable ${r.syl.idx + 1}` : r.syl.text}</b> — should be ${target}; ${heard}. Tip: ${tip}.</li>`;
   }).join("");
   box.innerHTML = `<canvas></canvas><div class="score ${cls}">${res.correct} / ${res.total} tones correct (${res.score}%)${res.score === 100 ? " 🎉" : ""}</div>` +
     (wrong ? `<ul class="fb">${wrong}</ul>` : "");
-  drawContours($("canvas", box), res);
+  drawContours($("canvas", box), res, hideText);
 }
 
-function drawContours(cv, res) {
+function drawContours(cv, res, hideText) {
   const css = getComputedStyle(document.documentElement), col = n => css.getPropertyValue(n).trim();
   const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = 150;
   cv.width = W * dpr; cv.height = H * dpr;
@@ -201,7 +202,7 @@ function drawContours(cv, res) {
     g.fillStyle = r.ok === true ? col("--good") : r.ok === false ? col("--bad") : col("--t5");
     g.fillText(r.ok === true ? "✓" : r.ok === false ? "✗" : "·", (x0 + x1) / 2, 14);
     g.fillStyle = tc;
-    g.fillText(s.text, (x0 + x1) / 2, H - 6);
+    g.fillText(hideText ? String(k + 1) : s.text, (x0 + x1) / 2, H - 6);
   });
 }
 

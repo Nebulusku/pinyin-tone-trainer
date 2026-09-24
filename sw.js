@@ -1,5 +1,5 @@
 /* Offline cache: app files load fresh when online (cache is the offline fallback); audio clips are cached permanently. */
-const VERSION = "ptt-v7";
+const VERSION = "ptt-v8";
 const SHELL = ["./", "index.html", "app.js", "login.js", "auth.js", "flashcards.js", "tone-engine.js", "lessons.js", "audio/manifest.js", "manifest.webmanifest", "icons/icon-192.png"];
 
 self.addEventListener("install", e => {
