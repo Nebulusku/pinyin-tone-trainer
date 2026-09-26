@@ -12,8 +12,8 @@ const save = () => {
 
 /* Progress that syncs between devices (settings like speed stay per device). */
 const exportState = () => {
-  const { best, cards, maxDay, startDate, streak, lastPractice, cal } = state;
-  return { best, cards, maxDay, startDate, streak, lastPractice, cal };
+  const { best, cards, maxDay, startDate, streak, lastPractice, cal, completed } = state;
+  return { best, cards, maxDay, startDate, streak, lastPractice, cal, completed };
 };
 /* Combines progress from another device: best scores max, flashcards by latest review, streak by latest day. */
 function mergeState(r) {
@@ -29,6 +29,8 @@ function mergeState(r) {
   if ((r.lastPractice || "") > (state.lastPractice || "")) { state.lastPractice = r.lastPractice; state.streak = r.streak; }
   else if (r.lastPractice === state.lastPractice) state.streak = Math.max(state.streak || 0, r.streak || 0);
   if (r.cal && (!state.cal || (r.cal.t || 0) > (state.cal.t || 0))) state.cal = r.cal;
+  state.completed = state.completed || {};
+  for (const [k, v] of Object.entries(r.completed || {})) if (!state.completed[k] || v < state.completed[k]) state.completed[k] = v;
   try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {}
   if (typeof onRemoteMerge === "function") onRemoteMerge();
 }
@@ -39,7 +41,26 @@ state.settings = Object.assign({ rate: 0.8, showZh: false, voice: "", role: "B" 
 const settings = state.settings;
 save();
 
-const todayIndex = () => Math.floor((new Date(dayStr()) - new Date(state.startDate)) / 864e5) % LESSONS.length;
+/* ---------- Lesson progress ----------
+   A lesson is done when every word scores ≥ 75%, every key phrase ≥ 60%, and one dialogue role
+   (all its lines recorded) averages ≥ 60%. Measured on the native voice: ~92% on words, ~78% on phrases. */
+const WORD_MIN = 75, PHRASE_MIN = 60, DIALOG_MIN = 60;
+function lessonProgress(d) {
+  const L = LESSONS[d], b = state.best;
+  const words = (L.words || []).filter((_, i) => (b[`d${d}-w${i}`] || 0) >= WORD_MIN).length;
+  const phrases = L.phrases.filter((_, i) => (b[`d${d}-p${i}`] || 0) >= PHRASE_MIN).length;
+  const roleOk = who => {
+    const s = L.dialog.lines.flatMap((l, i) => (l.who === who ? [b[`d${d}-l${i}`]] : []));
+    return s.length > 0 && s.every(x => x != null) && mean(s) >= DIALOG_MIN;
+  };
+  const done = words + phrases + (roleOk("A") || roleOk("B") ? 1 : 0), total = (L.words || []).length + L.phrases.length + 1;
+  return { done, total, complete: done === total };
+}
+/* "Today's lesson" = the first lesson not completed yet. */
+const todayIndex = () => {
+  for (let d = 0; d < LESSONS.length; d++) if (!(state.completed || {})[d]) return d;
+  return LESSONS.length - 1;
+};
 let day = todayIndex();
 
 /* ---------- Speech ---------- */
@@ -167,6 +188,7 @@ async function recordCard(card, { onResult } = {}) {
   renderResult(box, card.parsed, res);
   if (!res.error && res.score != null && card.id) {
     state.best[card.id] = Math.max(state.best[card.id] || 0, res.score);
+    if (/^d\d+-/.test(card.id)) updateProgress();
     card.showBest();
   }
   if (!res.error) bumpStreak();
@@ -192,13 +214,15 @@ function renderResult(box, parsed, res, { hideText } = {}) {
     return;
   }
   const cls = res.score >= 75 ? "good" : res.score < 50 ? "bad" : "";
-  const wrong = res.results.filter(r => r.ok === false).slice(0, 4).map(r => {
+  const wrong = res.results.filter(r => r.verdict === "bad").slice(0, 4).map(r => {
     const target = r.syl.sandhi ? "2nd (tone change)" : ORD[r.syl.tone];
     const heard = r.heard ? `sounded ${HEARD[r.got]}` : "not heard clearly";
     const tip = TIPS[r.syl.sandhi ? 2 : r.syl.tone];
     return `<li><b class="s t${r.syl.tone}">${hideText ? `Syllable ${r.syl.idx + 1}` : r.syl.text}</b> — should be ${target}; ${heard}. Tip: ${tip}.</li>`;
   }).join("");
-  box.innerHTML = `<canvas></canvas><div class="score ${cls}">${res.correct} / ${res.total} tones correct (${res.score}%)${res.score === 100 ? " 🎉" : ""}</div>` +
+  const parts = [`${res.correct} ✓`, res.unsure ? `${res.unsure} unclear` : "", res.wrong ? `${res.wrong} ✗` : ""].filter(Boolean).join(" · ");
+  box.innerHTML = `<canvas></canvas><div class="score ${cls}">${res.score}% — ${parts}${res.score === 100 ? " 🎉" : ""}</div>` +
+    (res.unsure ? `<p class="note">“Unclear” = the tone wasn't clearly right or wrong (counts half). Try saying it a little slower.</p>` : "") +
     (wrong ? `<ul class="fb">${wrong}</ul>` : "");
   drawContours($("canvas", box), res, hideText);
 }
@@ -229,8 +253,9 @@ function drawContours(cv, res, hideText) {
       r.pts.forEach((p, i) => (i ? g.lineTo : g.moveTo).call(g, X(p.x), y(p.z))); g.stroke();
     }
     g.font = "600 14px -apple-system, sans-serif";
-    g.fillStyle = r.ok === true ? col("--good") : r.ok === false ? col("--bad") : col("--t5");
-    g.fillText(r.ok === true ? "✓" : r.ok === false ? "✗" : "·", (x0 + x1) / 2, 14);
+    const mark = { ok: ["✓", "--good"], bad: ["✗", "--bad"], unsure: ["?", "--t2"] }[r.verdict] || ["·", "--t5"];
+    g.fillStyle = col(mark[1]);
+    g.fillText(mark[0], (x0 + x1) / 2, 14);
     g.fillStyle = tc;
     g.fillText(hideText ? String(k + 1) : s.text, (x0 + x1) / 2, H - 6);
   });
@@ -255,9 +280,10 @@ function renderDay() {
   if (day > (state.maxDay || 0)) { state.maxDay = day; save(); }
   const L = LESSONS[day], course = L.course || "Starter";
   const num = LESSONS.slice(0, day + 1).filter(x => (x.course || "Starter") === course).length;
-  $("#dayLabel").textContent = `${course} · lesson ${num}${day === todayIndex() ? " · today" : ""}`;
+  $("#dayLabel").textContent = `${course} · lesson ${num}${day === todayIndex() ? " · up next" : ""}`;
   $("#dayTitle").textContent = L.title;
   $("#lessonPick").value = day;
+  updateProgress();
   const wb = $("#words"), words = L.words || [];
   wb.innerHTML = "";
   $("#wordsH").hidden = !words.length;
@@ -352,7 +378,22 @@ function setupCalibration() {
 }
 
 /* ---------- Wiring ---------- */
-$("#lessonPick").innerHTML = LESSONS.map((L, i) => `<option value="${i}">${L.course || "Starter"} · ${L.title}</option>`).join("");
+function refreshPicker() {
+  $("#lessonPick").innerHTML = LESSONS.map((L, i) =>
+    `<option value="${i}">${(state.completed || {})[i] ? "✅ " : ""}${L.course || "Starter"} · ${L.title}</option>`).join("");
+  $("#lessonPick").value = day;
+}
+function updateProgress() {
+  const p = lessonProgress(day);
+  state.completed = state.completed || {};
+  const fresh = p.complete && !state.completed[day];
+  if (fresh) { state.completed[day] = dayStr(); save(); refreshPicker(); }
+  $("#progressFill").style.width = `${(100 * p.done) / p.total}%`;
+  $("#progressText").textContent = state.completed[day]
+    ? `✅ Lesson complete (${state.completed[day]})${fresh ? " — well done! 🎉" : ""}`
+    : `${p.done} of ${p.total} done`;
+}
+refreshPicker();
 $("#lessonPick").onchange = e => { day = +e.target.value; renderDay(); };
 $("#prevDay").onclick = () => { day = (day - 1 + LESSONS.length) % LESSONS.length; renderDay(); };
 $("#nextDay").onclick = () => { day = (day + 1) % LESSONS.length; renderDay(); };

@@ -158,79 +158,52 @@ function yinTrack(samples, sr) {
   return frames;
 }
 
-/* Marks voiced frames, converts to semitones (re 100 Hz), repairs octave jumps and drops blips. */
+/* Marks voiced frames, converts to semitones (re 100 Hz), repairs octave errors and drops blips.
+   Repairs work per voiced run, so a genuinely high tone isn't "corrected" against the whole utterance. */
 function cleanFrames(frames) {
   if (!frames.length) return frames;
   const r = frames.map(f => f.rms).sort((a, b) => a - b);
-  const thr = Math.max(pct(r, 0.1) * 3, r[r.length - 1] * 0.05, 0.003);
+  const thr = Math.max(pct(r, 0.1) * 3, r[r.length - 1] * 0.03, 0.002);
   frames.forEach(f => {
     f.voiced = f.f0 > 0 && f.rms > thr;
     f.st = f.voiced ? 12 * Math.log2(f.f0 / 100) : null;
   });
-  const v = frames.filter(f => f.voiced);
-  if (!v.length) return frames;
-  const med = median(v.map(f => f.st));
-  v.forEach(f => { while (f.st - med > 8) f.st -= 12; while (med - f.st > 8) f.st += 12; });
-  for (let i = 0; i < v.length; i++) {
-    const win = v.slice(Math.max(0, i - 2), i + 3).map(f => f.st);
-    const lm = median(win);
-    if (Math.abs(v[i].st - lm) > 3) v[i].st = lm;
-  }
-  let i = 0;
-  while (i < frames.length) {
+  const runs = [];
+  for (let i = 0; i < frames.length; ) {
     if (!frames[i].voiced) { i++; continue; }
     let j = i;
     while (j < frames.length && frames[j].voiced) j++;
     if (j - i < 4) for (let k = i; k < j; k++) frames[k].voiced = false;
+    else runs.push([i, j]);
     i = j;
+  }
+  for (const [a, b] of runs) {
+    const m = median(frames.slice(a, b).map(f => f.st));
+    for (let k = a; k < b; k++) { const f = frames[k]; while (f.st - m > 9) f.st -= 12; while (m - f.st > 9) f.st += 12; }
+    const raw = frames.slice(a, b).map(f => f.st);
+    for (let k = a; k < b; k++) {
+      const lm = median(raw.slice(Math.max(0, k - a - 2), k - a + 3));
+      if (Math.abs(frames[k].st - lm) > 3) frames[k].st = lm;
+    }
+  }
+  const voiced = frames.filter(f => f.voiced).map(f => f.st);
+  if (voiced.length) {
+    const all = median(voiced);
+    for (const [a, b] of runs) {
+      const m = median(frames.slice(a, b).map(f => f.st)), shift = m - all > 10 ? -12 : all - m > 10 ? 12 : 0;
+      if (shift) for (let k = a; k < b; k++) frames[k].st += shift;
+    }
   }
   return frames;
 }
 
-/* Splits the voiced span into n syllable segments at the deepest gaps / energy dips. */
-function segment(frames, n) {
-  const idx = [];
-  frames.forEach((f, i) => f.voiced && idx.push(i));
-  if (idx.length < n * 3) return null;
-  const a = idx[0], b = idx[idx.length - 1] + 1;
-  const maxR = Math.max(...idx.map(i => frames[i].rms));
-  const sm = frames.map((_, i) => {
-    let s = 0, c = 0;
-    for (let k = i - 2; k <= i + 2; k++) if (frames[k]) { s += frames[k].rms; c++; }
-    return s / c / maxR;
-  });
-  const cand = [];
-  for (let i = a; i < b; ) {
-    if (!frames[i].voiced) {
-      let j = i;
-      while (j < b && !frames[j].voiced) j++;
-      cand.push({ at: Math.floor((i + j) / 2), score: -(j - i) });
-      i = j;
-    } else {
-      if (i > a && i < b - 1 && frames[i - 1].voiced && frames[i + 1].voiced && sm[i] <= sm[i - 1] && sm[i] <= sm[i + 1])
-        cand.push({ at: i, score: sm[i] });
-      i++;
-    }
-  }
-  cand.sort((p, q) => p.score - q.score);
-  const minDist = Math.max(4, (0.4 * (b - a)) / n), cuts = [];
-  for (const c of cand) {
-    if (cuts.length >= n - 1) break;
-    if (c.at - a < minDist || b - c.at < minDist || cuts.some(x => Math.abs(x - c.at) < minDist)) continue;
-    cuts.push(c.at);
-  }
-  while (cuts.length < n - 1) {
-    const bd = [a, ...cuts.sort((x, y) => x - y), b];
-    let k = 0;
-    for (let m = 1; m < bd.length - 1; m++) if (bd[m + 1] - bd[m] > bd[k + 1] - bd[k]) k = m;
-    cuts.push(Math.floor((bd[k] + bd[k + 1]) / 2));
-  }
-  const bd = [a, ...cuts.sort((x, y) => x - y), b];
-  return bd.slice(0, -1).map((s, k) => [s, bd[k + 1]]);
-}
+/* ---------- Tone checking ----------
+   1. Alignment: the known number of syllables is fitted to the pitch track with dynamic programming,
+      choosing cut points on volume dips / pauses where each piece looks like *some* tone
+      (never the expected one — otherwise any tone could be made to fit).
+   2. Per-tone checks with tolerance, on semitone features (start, end, lowest point, level). */
 
-/* ---------- Tone classification ---------- */
-/* Target contours in normalised pitch units: +1 = top of your range, -1 = bottom. */
+/* Target shapes, only used to draw the dashed guide lines (+1 = top of your range, -1 = bottom). */
 const TEMPLATES = {
   1: [0.9, 0.9, 0.9, 0.9, 0.9],
   2: [-0.2, -0.15, 0.15, 0.5, 0.9],
@@ -238,28 +211,111 @@ const TEMPLATES = {
   "3h": [-0.45, -0.75, -0.95, -1.05, -1.1],
   4: [1, 0.7, 0.2, -0.35, -0.9],
 };
+/* Verdicts, chosen on held-out native recordings (tools/train_tones.js):
+   ✓ "ok"     expected tone is the most likely one, or at least 30% likely
+   ✗ "bad"    expected tone is under 5% likely — clearly another tone
+   ? "unsure" anything in between (counts half in the score) */
+const OK_P = 0.3, BAD_P = 0.05;
 
-function resample(vals, k = 5) {
-  const out = [];
-  for (let i = 0; i < k; i++) {
-    const s = Math.floor((i * vals.length) / k), e = Math.max(s + 1, Math.floor(((i + 1) * vals.length) / k));
-    out.push(mean(vals.slice(s, e)));
+/* Pitch features of one syllable: semitone values of its voiced frames, ends trimmed. */
+function features(st) {
+  const t = Math.floor(st.length * 0.1), v = st.length - 2 * t >= 3 ? st.slice(t, st.length - t) : st;
+  const q = Math.max(1, Math.round(v.length / 4));
+  const S = mean(v.slice(0, q)), E = mean(v.slice(-q)), L = mean(v);
+  let M = Infinity, pm = 0;
+  for (let i = 0; i < v.length; i++) { const w = mean(v.slice(Math.max(0, i - 1), i + 2)); if (w < M) { M = w; pm = i / Math.max(1, v.length - 1); } }
+  const mid = mean(v.slice(q, Math.max(q + 1, v.length - q)));
+  return { S, E, L, M, pm, fall: S - E, rise: E - M, curv: mid - (S + E) / 2 };
+}
+
+/* Tone model: per tone, mean + spread of each pitch feature, learned from native recordings
+   (tools/train_tones.js → tone-model.js), separately for words said on their own ("iso"),
+   syllables inside a phrase ("mid") and the last syllable of a phrase ("final"). */
+/* ds = start of this syllable minus end of the previous one (null for the first syllable / during alignment). */
+const FEATS = ["fall", "rise", "pm", "curv", "l", "ls", "le", "ds"];
+function featureVector(f, lvl, ds = null) {
+  return { fall: f.fall, rise: f.rise, pm: f.pm, curv: f.curv, l: lvl ? lvl(f.L) : null, ls: lvl ? lvl(f.S) : null, le: lvl ? lvl(f.E) : null, ds };
+}
+
+/* Cost of each tone for one syllable = average negative log-likelihood under that tone's model
+   (level features are skipped when the level is unknown: single word, no calibration). */
+function toneCosts(f, lvl, group, ds = null) {
+  const x = featureVector(f, lvl, ds), m = TONE_MODEL[group] || TONE_MODEL.final, out = {};
+  for (const t of [1, 2, 3, 4]) {
+    let nll = 0, k = 0;
+    FEATS.forEach((name, i) => {
+      if (x[name] == null) return;
+      const z = (x[name] - m[t].mu[i]) / m[t].sd[i];
+      nll += 0.5 * z * z + Math.log(m[t].sd[i]);
+      k++;
+    });
+    out[t] = nll / k;
   }
   return out;
 }
 
-/* Shape match (amplitude-tolerant) plus pitch-level match. Returns {tone: distance}. */
-function matchTone(c, wLevel) {
-  const cm = mean(c), cc = c.map(v => v - cm), scores = {};
-  for (const key in TEMPLATES) {
-    const t = TEMPLATES[key], tm = mean(t), tc = t.map(v => v - tm), tt = dot(tc, tc);
-    const a = tt ? Math.min(1.6, Math.max(0.4, dot(cc, tc) / tt)) : 0;
-    const shape = cc.reduce((s, v, i) => s + (v - a * tc[i]) ** 2, 0) / c.length;
-    const dist = shape + wLevel * (cm - tm) ** 2;
-    const tone = key === "3h" ? 3 : +key;
-    if (!(tone in scores) || dist < scores[tone]) scores[tone] = dist;
-  }
-  return scores;
+/* Probability of each tone (softmax of costs) — used for pass/fail. */
+function toneProbs(tc) {
+  const n = Object.keys(tc).length, best = Math.min(...Object.values(tc)), e = {};
+  let sum = 0;
+  for (const t in tc) { e[t] = Math.exp(-(tc[t] - best) * n); sum += e[t]; }
+  for (const t in e) e[t] /= sum;
+  return e;
+}
+
+/* Splits the voiced span into one segment per syllable (dynamic programming over cut points). */
+function alignSyllables(frames, syls, lvl) {
+  const vi = [];
+  frames.forEach((f, i) => f.voiced && vi.push(i));
+  const n = syls.length;
+  if (vi.length < Math.max(4, n * 3)) return null;
+  const a = vi[0], b = vi[vi.length - 1] + 1, span = b - a, avg = span / n, step = span > 300 ? 2 : 1;
+  const maxR = Math.max(...vi.map(i => frames[i].rms));
+  const energy = i => {
+    let s = 0, c = 0;
+    for (let k = i - 2; k <= i + 2; k++) if (frames[k]) { s += frames[k].voiced ? frames[k].rms : 0; c++; }
+    return s / c / maxR;
+  };
+  const P = [];
+  for (let p = a; p < b; p += step) P.push(p);
+  P.push(b);
+  const minLen = Math.max(3, Math.floor(avg * 0.25)), maxLen = Math.ceil(avg * 2.6) + 4;
+  const memo = new Map();
+  const costsOf = (i, j) => {
+    const key = i * 100000 + j;
+    if (!memo.has(key)) {
+      const st = [];
+      for (let k = i; k < j; k++) if (frames[k].voiced) st.push(frames[k].st);
+      memo.set(key, st.length >= 3 ? toneCosts(features(st), lvl, n === 1 ? "iso" : j === b ? "final" : "mid") : null);
+    }
+    return memo.get(key);
+  };
+  const segCost = (k, i, j) => {
+    const syl = syls[k], len = j - i, want = syl.expect ? avg * 1.1 : avg * 0.6;
+    let c = 0.35 * ((len - want) / want) ** 2 + (k ? energy(i) * 0.8 : 0);
+    if (syl.expect) {
+      const tc = costsOf(i, j);
+      c += tc ? Math.min(tc[1], tc[2], tc[3], tc[4]) : 3; // tone-agnostic: cuts must not depend on the expected tone
+    }
+    return c;
+  };
+  const INF = 1e9, D = Array.from({ length: n + 1 }, () => new Float64Array(P.length).fill(INF));
+  const back = Array.from({ length: n + 1 }, () => new Int32Array(P.length).fill(-1));
+  D[0][0] = 0;
+  for (let k = 0; k < n; k++)
+    for (let x = 0; x < P.length; x++) {
+      if (D[k][x] >= INF) continue;
+      for (let y = x + 1; y < P.length && P[y] - P[x] <= maxLen; y++) {
+        if (P[y] - P[x] < minLen && y !== P.length - 1) continue;
+        const c = D[k][x] + segCost(k, P[x], P[y]);
+        if (c < D[k + 1][y]) { D[k + 1][y] = c; back[k + 1][y] = x; }
+      }
+    }
+  let y = P.length - 1;
+  if (D[n][y] >= INF) return null;
+  const segs = [];
+  for (let k = n; k > 0; k--) { const x = back[k][y]; segs.unshift([P[x], P[y]]); y = x; }
+  return segs;
 }
 
 function voicedSemitones(frames) {
@@ -276,25 +332,32 @@ function calibrate(samples, sr) {
 
 function analyzeUtterance(samples, sr, parsed, cal) {
   const frames = cleanFrames(yinTrack(samples, sr));
-  const n = parsed.syls.length, segs = segment(frames, n);
-  if (!segs) return { error: "I couldn't hear enough voice. Speak a little louder or closer to the microphone." };
-  let ref = cal;
+  const n = parsed.syls.length, st = voicedSemitones(frames);
+  if (st.length < Math.max(4, n * 3)) return { error: "I couldn't hear enough voice. Speak a little louder or closer to the microphone." };
+  let ref = cal, lvl = null;
   if (!ref) {
-    const st = voicedSemitones(frames), lo = pct(st, 0.15), hi = pct(st, 0.85);
+    const lo = pct(st, 0.1), hi = pct(st, 0.9);
     ref = { center: (lo + hi) / 2, unit: Math.max(3, (hi - lo) / 2) };
   }
-  const wLevel = !cal && n <= 1 ? 0.05 : 0.4;
+  if (cal || n >= 3) lvl = x => Math.max(-1.6, Math.min(1.6, (x - ref.center) / ref.unit));
+  const segs = alignSyllables(frames, parsed.syls, lvl);
+  if (!segs) return { error: "I couldn't match your recording to the phrase. Try saying the whole phrase clearly." };
+  let prevE = null;
   const results = parsed.syls.map((syl, k) => {
-    const [s, e] = segs[k], pts = [];
+    const [s, e] = segs[k], pts = [], vals = [];
     for (let i = s; i < e; i++)
-      if (frames[i].voiced) pts.push({ x: (i - s) / Math.max(1, e - s - 1), z: (frames[i].st - ref.center) / ref.unit });
-    if (pts.length < 3) return { syl, heard: false, pts, ok: syl.expect ? false : null };
-    const trim = Math.floor(pts.length * 0.12);
-    const core = pts.slice(trim, pts.length - trim).map(p => p.z);
-    const scores = matchTone(resample(core.length >= 3 ? core : pts.map(p => p.z)), wLevel);
-    const got = +Object.keys(scores).sort((p, q) => scores[p] - scores[q])[0];
-    return { syl, heard: true, pts, got, ok: syl.expect ? syl.expect.includes(got) : null };
+      if (frames[i].voiced) { pts.push({ x: (i - s) / Math.max(1, e - s - 1), z: (frames[i].st - ref.center) / ref.unit }); vals.push(frames[i].st); }
+    if (vals.length < 3) return { syl, heard: false, pts, ok: syl.expect ? false : null, verdict: syl.expect ? "bad" : null };
+    const group = n === 1 ? "iso" : k === n - 1 ? "final" : "mid";
+    const f = features(vals), tc = toneCosts(f, lvl, group, prevE == null ? null : f.S - prevE);
+    prevE = f.E;
+    const got = +Object.keys(tc).sort((p, q) => tc[p] - tc[q])[0];
+    const pr = toneProbs(tc), pe = syl.expect ? syl.expect.reduce((a, t) => a + pr[t], 0) : 0;
+    const verdict = !syl.expect ? null : syl.expect.includes(got) || pe >= OK_P ? "ok" : pe < BAD_P ? "bad" : "unsure";
+    return { syl, heard: true, pts, got, ok: verdict ? verdict === "ok" : null, verdict, p: pe };
   });
-  const graded = results.filter(r => r.syl.expect), correct = graded.filter(r => r.ok).length;
-  return { results, correct, total: graded.length, score: graded.length ? Math.round((100 * correct) / graded.length) : null };
+  const graded = results.filter(r => r.syl.expect), count = v => graded.filter(r => r.verdict === v).length;
+  const correct = count("ok"), unsure = count("unsure"), wrong = count("bad");
+  const score = graded.length ? Math.round((100 * (correct + unsure / 2)) / graded.length) : null;
+  return { results, correct, unsure, wrong, total: graded.length, score };
 }

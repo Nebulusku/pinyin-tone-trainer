@@ -81,6 +81,10 @@ body.show-zh .zh { display: block; }
 .tabs #syncStatus { margin-left: auto; font-size: .75rem; overflow-wrap: anywhere; }
 .tabs #signOut { margin-left: 0; font-size: .8rem; padding: 4px 10px; color: var(--muted); }
 .pick { text-align: center; margin-bottom: 6px; }
+.progress { text-align: center; margin: 4px 0 10px; }
+.progress .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; max-width: 420px; margin: 0 auto 4px; }
+.progress .bar i { display: block; height: 100%; width: 0; background: var(--good); transition: width .3s; }
+.progress p { margin: 2px 0 0; font-size: .75rem; }
 .pick select { font: inherit; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); max-width: 100%; }
 .words { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
 .words .card { margin: 0; padding: 12px; }
@@ -162,6 +166,11 @@ body.show-zh .zh { display: block; }
     <button id="nextDay" aria-label="Next day">›</button>
   </div>
   <div class="pick"><select id="lessonPick" aria-label="Jump to lesson"></select></div>
+  <div class="progress">
+    <div class="bar"><i id="progressFill"></i></div>
+    <span class="note" id="progressText"></span>
+    <p class="note">Done when: each word ≥ 75%, each phrase ≥ 60%, and one dialogue role ≥ 60% on average.</p>
+  </div>
   <div class="legend">
     <span><b class="s t1">ā</b> 1st high &amp; flat</span>
     <span><b class="s t2">á</b> 2nd rising</span>
@@ -199,6 +208,7 @@ body.show-zh .zh { display: block; }
 <script src="lessons.js"></script>
 <script src="lessons-hsk1.js"></script>
 <script src="audio/manifest.js"></script>
+<script src="tone-model.js"></script>
 <script src="tone-engine.js"></script>
 <script src="app.js"></script>
 <script src="flashcards.js"></script>
