@@ -178,13 +178,15 @@ async function recordCard(card, { onResult } = {}) {
   btn.textContent = "⏹ Stop";
   card.el.classList.add("recording");
   box.innerHTML = `<p class="note">Listening… speak now (stops automatically when you finish).</p>`;
-  const { samples, sr, heard } = await rec.done;
+  const { samples, sr, heard, dead } = await rec.done;
   Mic.releaseOnMobile();
   activeRec = null;
   btn.classList.remove("on");
   btn.textContent = "🎙 Record";
   card.el.classList.remove("recording");
-  const res = heard ? analyzeUtterance(samples, sr, card.parsed, state.cal) : { error: "I didn't hear anything. Check the microphone and try again." };
+  const res = dead ? { error: "The microphone didn't start. Tap Record again — on iPhone, check Settings › Safari › Microphone is set to Allow." }
+    : heard ? analyzeUtterance(samples, sr, card.parsed, state.cal)
+    : { error: "I didn't hear anything. Hold the phone closer and speak a bit louder, then try again." };
   renderResult(box, card.parsed, res);
   if (!res.error && res.score != null && card.id) {
     state.best[card.id] = Math.max(state.best[card.id] || 0, res.score);

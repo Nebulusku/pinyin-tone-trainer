@@ -54,15 +54,19 @@ function syllableChars(zh, parsed) {
 const Mic = {
   ctx: null,
   stream: null,
+  /* Call straight from a tap: iOS only lets the audio engine start inside the tap itself,
+     so it is created/resumed before anything is awaited. */
   async init() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
-      throw new Error("Microphone not available — open this file in Chrome or Safari.");
+      throw new Error("Microphone not available — open the app in Safari or Chrome.");
+    if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const resuming = this.ctx.state !== "running" ? this.ctx.resume().catch(() => {}) : null;
     if (!this.stream)
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true },
       });
-    if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if (this.ctx.state === "suspended") await this.ctx.resume();
+    if (resuming) await resuming;
+    if (this.ctx.state !== "running") await this.ctx.resume().catch(() => {});
   },
   /* On phones an open mic switches audio to the quiet earpiece, so release it after each recording. */
   releaseOnMobile() {
@@ -77,17 +81,23 @@ const Mic = {
     const src = ctx.createMediaStreamSource(this.stream);
     const proc = ctx.createScriptProcessor(2048, 1, 1);
     const chunks = [];
-    let elapsed = 0, heard = false, quiet = 0, floor = null, stopped = false, resolve;
+    let elapsed = 0, heard = false, quiet = 0, floor = null, stopped = false, peak = 0, resolve;
     const done = new Promise(r => (resolve = r));
+    const started = Date.now();
+    // safety nets: stop on wall-clock time, and notice a microphone that delivers no audio at all
+    const guard = setTimeout(() => stop(), maxMs + 1000);
+    const deadCheck = setTimeout(() => { if (!chunks.length) stop(); }, 1500);
     const stop = () => {
       if (stopped) return;
       stopped = true;
+      clearTimeout(guard);
+      clearTimeout(deadCheck);
       proc.onaudioprocess = null;
       try { src.disconnect(); proc.disconnect(); } catch (e) {}
       const out = new Float32Array(chunks.reduce((s, c) => s + c.length, 0));
       let o = 0;
       chunks.forEach(c => { out.set(c, o); o += c.length; });
-      resolve({ samples: out, sr: ctx.sampleRate, heard });
+      resolve({ samples: out, sr: ctx.sampleRate, heard: heard || peak > 0.02, dead: !chunks.length, ms: Date.now() - started });
     };
     proc.onaudioprocess = e => {
       const d = e.inputBuffer.getChannelData(0);
@@ -95,6 +105,7 @@ const Mic = {
       let s = 0;
       for (let i = 0; i < d.length; i++) s += d[i] * d[i];
       const r = Math.sqrt(s / d.length), ms = (1000 * d.length) / ctx.sampleRate;
+      peak = Math.max(peak, r);
       elapsed += ms;
       if (floor === null || elapsed < 300) floor = floor === null ? r : Math.min(floor, r);
       if (r > Math.max(0.012, floor * 4)) { heard = true; quiet = 0; } else if (heard) quiet += ms;

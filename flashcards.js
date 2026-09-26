@@ -72,7 +72,8 @@ function fcShow() {
     recBtn.classList.remove("on");
     answer = r.heard ? r : null;
     recBtn.textContent = answer ? "🎙 Record again" : "🎙 Record my answer";
-    status.textContent = answer ? "Tone check below — flip to see if you had the right words." : "Didn't hear anything — try again.";
+    status.textContent = answer ? "Tone check below — flip to see if you had the right words."
+      : r.dead ? "The microphone didn't start — tap Record again." : "Didn't hear anything — try again.";
     if (answer) {
       answer.res = analyzeUtterance(answer.samples, answer.sr, card.parsed, state.cal);
       renderResult(front, card.parsed, answer.res, { hideText: true });
