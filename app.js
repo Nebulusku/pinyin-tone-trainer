@@ -138,18 +138,16 @@ function practiceCard(item, { id, who, isMe } = {}) {
   if (!chars) console.warn("Hanzi/pinyin mismatch:", item.zh, item.py);
   const el = document.createElement("div");
   el.className = "card";
-  const pic = !who && typeof WS_PICS !== "undefined" && WS_PICS[item.zh.replace(/[，。？！、,.?!…—\s]/g, "")];
   const pyHtml = parsed.words.map((w, wi) =>
     `<span class="p">${w.pre}</span><span class="w" data-w="${wi}">` +
     w.syls.map(s => `<span class="s t${s.tone}${s.sandhi ? " sandhi" : ""}"${s.sandhi ? ' title="3rd tone before another 3rd tone: say it as 2nd"' : ""}>${s.text}</span>`).join("") +
     `</span><span class="p">${w.post}</span>`).join(" ");
   el.innerHTML =
     (who ? `<span class="who who-${who}${isMe ? " me" : ""}">${who === "A" ? "Person 1" : "Person 2"}${isMe ? " · you" : ""}</span>` : "") +
-    (pic ? `<span class="pic">${pic}</span>` : "") +
     `<div class="py">${pyHtml}</div><div class="zh">${[...item.zh].map(c => /[，。？！、,.?!…—\s]/.test(c) ? "" : `<span class="hz">${c}</span>`).join("")}</div><div class="en">${item.en}</div>
      <div class="actions">
-       <button class="play">🔊 Listen</button><button class="slow">🐢 Slow</button>
-       <button class="rec">🎙 Record</button><span class="level"><i></i></span>
+       <button class="play">Listen</button><button class="slow">Slow</button>
+       <button class="rec">Record</button><span class="level"><i></i></span>
        <span class="best"></span>
      </div><div class="result"></div>`;
   const showBest = () => { const b = state.best[id]; $(".best", el).textContent = b != null ? `Best: ${b}%` : ""; };
@@ -177,14 +175,14 @@ async function recordCard(card, { onResult } = {}) {
   const rec = Mic.record({ maxMs: 3000 + card.parsed.syls.length * 700, onLevel: v => (lvl.style.width = v * 100 + "%") });
   activeRec = { card, stop: rec.stop };
   btn.classList.add("on");
-  btn.textContent = "⏹ Stop";
+  btn.textContent = "Stop";
   card.el.classList.add("recording");
   box.innerHTML = `<p class="note">Listening… speak now (stops automatically when you finish).</p>`;
   const { samples, sr, heard, dead } = await rec.done;
   Mic.releaseOnMobile();
   activeRec = null;
   btn.classList.remove("on");
-  btn.textContent = "🎙 Record";
+  btn.textContent = "Record";
   card.el.classList.remove("recording");
   const res = dead ? { error: "The microphone didn't start. Tap Record again — on iPhone, check Settings › Safari › Microphone is set to Allow." }
     : heard ? analyzeUtterance(samples, sr, card.parsed, state.cal)
@@ -225,7 +223,7 @@ function renderResult(box, parsed, res, { hideText } = {}) {
     return `<li><b class="s t${r.syl.tone}">${hideText ? `Syllable ${r.syl.idx + 1}` : r.syl.text}</b> — should be ${target}; ${heard}. Tip: ${tip}.</li>`;
   }).join("");
   const parts = [`${res.correct} ✓`, res.unsure ? `${res.unsure} unclear` : "", res.wrong ? `${res.wrong} ✗` : ""].filter(Boolean).join(" · ");
-  box.innerHTML = `<canvas></canvas><div class="score ${cls}">${res.score}% — ${parts}${res.score === 100 ? " 🎉" : ""}</div>` +
+  box.innerHTML = `<canvas></canvas><div class="score ${cls}">${res.score}% — ${parts}</div>` +
     (res.unsure ? `<p class="note">“Unclear” = the tone wasn't clearly right or wrong (counts half). Try saying it a little slower.</p>` : "") +
     (wrong ? `<ul class="fb">${wrong}</ul>` : "");
   drawContours($("canvas", box), res, hideText);
@@ -274,17 +272,20 @@ function bumpStreak() {
     showStreak();
   } else save();
 }
-const showStreak = () => ($("#streak").textContent = state.streak && state.lastPractice >= dayStr(new Date(Date.now() - 864e5)) ? `🔥 ${state.streak}-day streak` : "");
+const showStreak = () => ($("#streak").textContent = state.streak && state.lastPractice >= dayStr(new Date(Date.now() - 864e5)) ? `${state.streak}-day streak` : "");
 
 /* ---------- Lesson rendering ---------- */
+const ZH_DIGITS = "零一二三四五六七八九";
+const zhNum = n => n <= 10 ? (n === 10 ? "十" : ZH_DIGITS[n]) : n < 20 ? "十" + (n % 10 ? ZH_DIGITS[n % 10] : "") : ZH_DIGITS[Math.floor(n / 10)] + "十" + (n % 10 ? ZH_DIGITS[n % 10] : "");
+/* Header line shared by all tabs and the worksheets: 第十六课 Lesson 16 · HSK 1 */
+const lessonLabel = i => `第${zhNum(i + 1)}课 Lesson ${i + 1}${LESSONS[i].course ? " · " + LESSONS[i].course : ""}`;
 let lineCards = [];
 
 function renderDay() {
   stopDialog();
   if (day > (state.maxDay || 0)) { state.maxDay = day; save(); }
-  const L = LESSONS[day], course = L.course || "Starter";
-  const num = LESSONS.slice(0, day + 1).filter(x => (x.course || "Starter") === course).length;
-  $("#dayLabel").textContent = `${course} · lesson ${num}${day === todayIndex() ? " · up next" : ""}`;
+  const L = LESSONS[day];
+  $("#dayLabel").textContent = `${lessonLabel(day)}${day === todayIndex() ? " · up next" : ""}`;
   $("#dayTitle").textContent = L.title;
   $("#lessonPick").value = day;
   updateProgress();
@@ -308,7 +309,7 @@ function renderLines() {
     return c;
   });
   document.querySelectorAll("#roleSeg button").forEach(b => b.classList.toggle("sel", b.dataset.role === settings.role));
-  $("#runDialog").textContent = settings.role === "listen" ? "▶ Play dialogue" : "▶ Start dialogue";
+  $("#runDialog").textContent = settings.role === "listen" ? "Play dialogue" : "Start dialogue";
 }
 
 /* ---------- Dialogue runner ---------- */
@@ -328,7 +329,7 @@ async function runDialog() {
   if (role !== "listen") {
     try { await Mic.init(); } catch (e) { alert(e.message || "Microphone permission was denied."); dialogRun = null; return; }
   }
-  btn.textContent = "⏹ Stop";
+  btn.textContent = "Stop";
   const lines = LESSONS[day].dialog.lines;
   for (let i = 0; i < lines.length && !run.abort; i++) {
     const c = lineCards[i];
@@ -347,7 +348,7 @@ async function runDialog() {
   }
   lineCards.forEach(x => x.el.classList.remove("active"));
   dialogRun = null;
-  btn.textContent = role === "listen" ? "▶ Play dialogue" : "▶ Start dialogue";
+  btn.textContent = role === "listen" ? "Play dialogue" : "Start dialogue";
 }
 
 /* ---------- Calibration ---------- */
@@ -366,12 +367,12 @@ function setupCalibration() {
     const lvl = $(".level i", card.el), btn = $(".rec", card.el);
     const rec = Mic.record({ maxMs: 9000, silenceMs: 1600, onLevel: v => (lvl.style.width = v * 100 + "%") });
     activeRec = { card, stop: rec.stop };
-    btn.classList.add("on"); btn.textContent = "⏹ Stop"; card.el.classList.add("recording");
+    btn.classList.add("on"); btn.textContent = "Stop"; card.el.classList.add("recording");
     box.innerHTML = `<p class="note">Listening… mā — má — mǎ — mà</p>`;
     const { samples, sr } = await rec.done;
     Mic.releaseOnMobile();
     activeRec = null;
-    btn.classList.remove("on"); btn.textContent = "🎙 Record"; card.el.classList.remove("recording");
+    btn.classList.remove("on"); btn.textContent = "Record"; card.el.classList.remove("recording");
     const cal = calibrate(samples, sr);
     if (!cal) { box.innerHTML = `<p class="err">Not enough voice heard — try again a bit louder.</p>`; return; }
     state.cal = Object.assign(cal, { t: Date.now() });
@@ -384,7 +385,7 @@ function setupCalibration() {
 /* ---------- Wiring ---------- */
 function refreshPicker() {
   $("#lessonPick").innerHTML = LESSONS.map((L, i) =>
-    `<option value="${i}">${(state.completed || {})[i] ? "✅ " : ""}${L.course || "Starter"} · ${L.title}</option>`).join("");
+    `<option value="${i}">${(state.completed || {})[i] ? "✓ " : ""}Lesson ${i + 1} · ${L.title}</option>`).join("");
   $("#lessonPick").value = day;
 }
 function updateProgress() {
@@ -394,13 +395,21 @@ function updateProgress() {
   if (fresh) { state.completed[day] = dayStr(); save(); refreshPicker(); }
   $("#progressFill").style.width = `${(100 * p.done) / p.total}%`;
   $("#progressText").textContent = state.completed[day]
-    ? `✅ Lesson complete (${state.completed[day]})${fresh ? " — well done! 🎉" : ""}`
+    ? `✓ Lesson complete (${state.completed[day]})${fresh ? " — well done!" : ""}`
     : `${p.done} of ${p.total} done`;
 }
 refreshPicker();
-$("#lessonPick").onchange = e => { day = +e.target.value; renderDay(); };
-$("#prevDay").onclick = () => { day = (day - 1 + LESSONS.length) % LESSONS.length; renderDay(); };
-$("#nextDay").onclick = () => { day = (day + 1) % LESSONS.length; renderDay(); };
+/* One lesson selector for all tabs: Lesson, Cards and Sheets all follow `day`. */
+function setDay(n) {
+  stopSpeech();
+  day = (n + LESSONS.length) % LESSONS.length;
+  renderDay();
+  if (fcStarted) fcStart();
+  if (wsStarted) wsRender();
+}
+$("#lessonPick").onchange = e => setDay(+e.target.value);
+$("#prevDay").onclick = () => setDay(day - 1);
+$("#nextDay").onclick = () => setDay(day + 1);
 $("#rate").value = settings.rate;
 $("#rate").oninput = e => { settings.rate = +e.target.value; save(); };
 $("#showZh").checked = settings.showZh;

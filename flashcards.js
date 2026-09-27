@@ -1,16 +1,16 @@
 /* Flashcards with simple spaced repetition (Leitner boxes). Uses practiceCard() from app.js for the card itself. */
 const FC_INTERVALS = [0, 1, 2, 4, 7, 14, 30]; // days until next review, per box
-const FC_NEW_PER_SESSION = 10;
+const FC_NEW_PER_SESSION = 50; // a lesson has at most ~25 items, so a session covers all of its new cards
 let fcSession = [], fcDone = 0;
 
 const addDays = (d, n) => { const x = new Date(d + "T12:00:00"); x.setDate(x.getDate() + n); return dayStr(x); };
 
-/* All words, phrases + dialogue lines from lessons up to the furthest day reached, without duplicates. */
+/* Words, phrases + dialogue lines of the lesson chosen in the shared lesson selector, without duplicates. */
 function fcDeck() {
-  const upto = Math.max(state.maxDay || 0, todayIndex()), seen = new Set(), deck = [];
-  LESSONS.slice(0, upto + 1).forEach(L => [...(L.words || []), ...L.phrases, ...L.dialog.lines].forEach(it => {
+  const L = LESSONS[day], seen = new Set(), deck = [];
+  [...(L.words || []), ...L.phrases, ...L.dialog.lines].forEach(it => {
     if (!seen.has(it.zh)) { seen.add(it.zh); deck.push(it); }
-  }));
+  });
   return deck;
 }
 
@@ -29,7 +29,7 @@ function fcStart(extra) {
 function fcStats() {
   const today = dayStr(), deck = fcDeck(), cards = state.cards || {};
   const learned = deck.filter(c => cards[c.zh] && cards[c.zh].box >= 3).length;
-  return `${fcSession.length} left in this session · ${learned} of ${deck.length} learned`;
+  return `${fcSession.length} left in this session · ${learned} of ${deck.length} learned in this lesson`;
 }
 
 function fcShow() {
@@ -37,8 +37,8 @@ function fcShow() {
   $("#fcCount").textContent = fcStats();
   box.innerHTML = "";
   if (!fcSession.length) {
-    box.innerHTML = `<div class="card fc-done"><div class="py">🎉 All done for today</div>
-      <p class="en">${fcDone} cards reviewed. Come back tomorrow — or practise a few more now.</p>
+    box.innerHTML = `<div class="card fc-done"><div class="py">All done for this lesson</div>
+      <p class="en">${fcDone} cards reviewed. Come back tomorrow, pick another lesson above — or practise a few more now.</p>
       <div class="actions"><button class="primary" id="fcMore">Practise 10 more</button></div></div>`;
     $("#fcMore").onclick = () => fcStart(true);
     return;
@@ -50,7 +50,7 @@ function fcShow() {
     `<p class="note fc-prompt">${dir === "en" ? "Say it in Chinese from memory — record your answer, then flip to check." : "What does it mean? Read it aloud (you can record it), then flip."}</p>`);
   const flip = document.createElement("div");
   flip.className = "actions fc-controls";
-  flip.innerHTML = `<button class="fc-rec">🎙 Record my answer</button><span class="fc-status note"></span>
+  flip.innerHTML = `<button class="fc-rec">Record my answer</button><span class="fc-status note"></span>
     <button class="primary fc-flip">Show answer</button>`;
   card.el.appendChild(flip);
   const front = document.createElement("div");
@@ -64,14 +64,14 @@ function fcShow() {
     try { await Mic.init(); } catch (e) { status.textContent = e.message || "Microphone permission was denied."; return; }
     rec = Mic.record({ maxMs: 3000 + card.parsed.syls.length * 700 });
     recBtn.classList.add("on");
-    recBtn.textContent = "⏹ Stop";
+    recBtn.textContent = "Stop";
     status.textContent = "Listening…";
     const r = await rec.done;
     Mic.releaseOnMobile();
     rec = null;
     recBtn.classList.remove("on");
     answer = r.heard ? r : null;
-    recBtn.textContent = answer ? "🎙 Record again" : "🎙 Record my answer";
+    recBtn.textContent = answer ? "Record again" : "Record my answer";
     status.textContent = answer ? "Tone check below — flip to see if you had the right words."
       : r.dead ? "The microphone didn't start — tap Record again." : "Didn't hear anything — try again.";
     if (answer) {
@@ -86,12 +86,12 @@ function fcShow() {
     $(".fc-prompt", card.el).textContent = answer ? "Here's how you did — compare, then rate yourself:" : "Listen, repeat, then rate yourself:";
     if (answer) {
       renderResult($(".result", card.el), card.parsed, answer.res);
-      $(".play", card.el).insertAdjacentHTML("afterend", `<button class="fc-mine">▶ My answer</button>`);
+      $(".play", card.el).insertAdjacentHTML("afterend", `<button class="fc-mine">My answer</button>`);
       $(".fc-mine", card.el).onclick = () => playRecording(answer);
     }
     speak(item.zh);
-    flip.innerHTML = `<button class="fc-rate" data-r="again">😕 Again</button>
-      <button class="fc-rate" data-r="good">🙂 Good</button><button class="fc-rate" data-r="easy">😎 Easy</button>`;
+    flip.innerHTML = `<button class="fc-rate" data-r="again">Again</button>
+      <button class="fc-rate" data-r="good">Good</button><button class="fc-rate" data-r="easy">Easy</button>`;
     flip.querySelectorAll(".fc-rate").forEach(b => (b.onclick = () => fcRate(item, b.dataset.r)));
   };
   box.appendChild(card.el);

@@ -1,6 +1,7 @@
 /* Printable A4 worksheets: 汉字 in practice boxes with pinyin, English and a picture. Tap a word to hear it. */
 const WORKSHEETS = [
   {
+    lesson: 0, // extra sheet shown with this lesson
     title: "Greetings", zh: "问候", py: "wèn hòu", footer: "Lesson 1 · Greetings",
     sections: [
       ["Saying hello", "打招呼", [
@@ -45,35 +46,31 @@ const WORKSHEETS = [
 
 const wsStrip = s => s.replace(/[，。？！、,.?!—…\s]/g, "");
 const wsPy = py => py.replace(/'/g, "");
-const WS_ZH_NUM = n => n <= 10 ? "零一二三四五六七八九十"[n] : n < 20 ? "十" + (n % 10 ? "零一二三四五六七八九"[n % 10] : "") : "二十" + (n % 10 ? "零一二三四五六七八九"[n % 10] : "");
 
-/* One sheet per lesson, built from LESSONS: words (5 across), key phrases (2 across) and the dialogue. */
-function wsLessonSheets() {
-  return LESSONS.map((L, i) => {
-    const item = it => [WS_PICS[wsStrip(it.zh)] || "", it.zh, wsPy(it.py), it.en];
-    const sections = [];
-    if (L.words && L.words.length) {
-      const short = L.words.every(w => wsStrip(w.zh).length <= 2); // 7 across only fits 1–2 character words
-      sections.push(["Words", "生词", L.words.map(item), L.words.length > 12 && short ? 7 : 6]);
-    }
-    sections.push(["Key phrases", "句子", L.phrases.map(item), 2]);
-    return {
-      title: L.title, zh: `第${WS_ZH_NUM(i + 1)}课`, py: `Lesson ${i + 1}${L.course ? " · " + L.course : ""}`,
-      footer: `Lesson ${i + 1} · ${L.title}`, sections, dialog: L.dialog,
-    };
-  });
+/* The sheet for lesson i, built from LESSONS: words (6–7 across), key phrases (2 across) and the dialogue. */
+function wsLessonSheet(i) {
+  const L = LESSONS[i], sections = [];
+  const item = it => [WS_PICS[wsStrip(it.zh)] || "", it.zh, wsPy(it.py), it.en];
+  if (L.words && L.words.length) {
+    const short = L.words.every(w => wsStrip(w.zh).length <= 2); // 7 across only fits 1–2 character words
+    sections.push(["Words", "生词", L.words.map(item), L.words.length > 12 && short ? 7 : 6]);
+  }
+  sections.push(["Key phrases", "句子", L.phrases.map(item), 2]);
+  return { title: L.title, zh: lessonLabel(i), py: "", footer: `Lesson ${i + 1} · ${L.title}`, sections, dialog: L.dialog };
 }
-let WS_ALL = WORKSHEETS;
+/* Sheets for the lesson chosen in the shared selector: its own sheet plus any extra sheets for it. */
+const wsSheets = () => [wsLessonSheet(day), ...WORKSHEETS.filter(w => w.lesson === day)];
+let wsWhich = 0, wsDay = -1;
 
 const wsBoxes = zh => [...wsStrip(zh)].map(c => `<div class="ws-box"><span>${c}</span></div>`).join("");
 
 function wsRender() {
-  const n = Math.min(+(settings.ws || 0), WS_ALL.length - 1), W = WS_ALL[n];
-  $("#wsPick").value = n;
-  $("#wsCount").textContent = `Sheet ${n + 1} of ${WS_ALL.length}`;
-  $("#wsTitle").textContent = n ? `${W.footer}` : W.title;
-  $("#wsPrev").disabled = n === 0;
-  $("#wsNext").disabled = n === WS_ALL.length - 1;
+  const all = wsSheets();
+  if (wsDay !== day || wsWhich >= all.length) { wsWhich = 0; wsDay = day; }
+  const W = all[wsWhich], seg = $("#wsWhich");
+  seg.hidden = all.length < 2;
+  seg.innerHTML = all.map((w, k) => `<button data-k="${k}" class="${k === wsWhich ? "sel" : ""}">${k ? w.title : "Lesson sheet"}</button>`).join("");
+  seg.querySelectorAll("button").forEach(b => (b.onclick = () => { wsWhich = +b.dataset.k; wsRender(); }));
   $("#wsSheet").innerHTML = `
     <header class="ws-head">
       <div><h1>${W.title}</h1><span class="ws-hz">${W.zh} ${W.py}</span></div>
@@ -118,13 +115,6 @@ function wsFit() {
 }
 
 function wsInit() {
-  WS_ALL = [...WORKSHEETS, ...wsLessonSheets()];
-  const pick = $("#wsPick");
-  pick.innerHTML = WS_ALL.map((w, i) => `<option value="${i}">${i ? `${w.footer}` : `${w.title} ${w.zh}`}</option>`).join("");
-  const go = n => { settings.ws = String(Math.max(0, Math.min(WS_ALL.length - 1, n))); save(); stopSpeech(); wsRender(); };
-  pick.onchange = () => go(+pick.value);
-  $("#wsPrev").onclick = () => go(+(settings.ws || 0) - 1);
-  $("#wsNext").onclick = () => go(+(settings.ws || 0) + 1);
   $("#wsPrint").onclick = () => {
     document.body.classList.add("print-ws");
     window.print();

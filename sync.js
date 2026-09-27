@@ -45,11 +45,11 @@ const Sync = (() => {
   }
 
   async function run() {
-    if (!session || !navigator.onLine) { setStatus(session ? "☁️ offline — will sync later" : ""); return; }
+    if (!session || !navigator.onLine) { setStatus(session ? "offline — will sync later" : ""); return; }
     if (busy) { again = true; return; }
     busy = true;
     try {
-      setStatus("☁️ syncing…");
+      setStatus("syncing…");
       const rows = await rest(`progress?select=data&user_id=eq.${session.user.id}`);
       if (rows && rows[0]) mergeState(rows[0].data);
       await rest("progress", {
@@ -57,10 +57,10 @@ const Sync = (() => {
         headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
         body: JSON.stringify({ user_id: session.user.id, data: exportState(), updated_at: new Date().toISOString() }),
       });
-      setStatus(`☁️ synced ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
+      setStatus(`synced ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
     } catch (e) {
       console.error("Sync failed:", e);
-      setStatus(`☁️ sync failed (${String(e.message || e).slice(0, 90)})`);
+      setStatus(`sync failed (${String(e.message || e).slice(0, 90)})`);
     }
     busy = false;
     if (again) { again = false; schedule(); }
