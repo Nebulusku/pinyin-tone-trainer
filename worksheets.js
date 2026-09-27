@@ -43,31 +43,67 @@ const WORKSHEETS = [
   },
 ];
 
+const wsStrip = s => s.replace(/[，。？！、,.?!—…\s]/g, "");
+const wsPy = py => py.replace(/'/g, "");
+const WS_ZH_NUM = n => n <= 10 ? "零一二三四五六七八九十"[n] : n < 20 ? "十" + (n % 10 ? "零一二三四五六七八九"[n % 10] : "") : "二十" + (n % 10 ? "零一二三四五六七八九"[n % 10] : "");
+
+/* One sheet per lesson, built from LESSONS: words (5 across), key phrases (2 across) and the dialogue. */
+function wsLessonSheets() {
+  return LESSONS.map((L, i) => {
+    const item = it => [WS_PICS[wsStrip(it.zh)] || "", it.zh, wsPy(it.py), it.en];
+    const sections = [];
+    if (L.words && L.words.length) {
+      const short = L.words.every(w => wsStrip(w.zh).length <= 2); // 7 across only fits 1–2 character words
+      sections.push(["Words", "生词", L.words.map(item), L.words.length > 12 && short ? 7 : 6]);
+    }
+    sections.push(["Key phrases", "句子", L.phrases.map(item), 2]);
+    return {
+      title: L.title, zh: `第${WS_ZH_NUM(i + 1)}课`, py: `Lesson ${i + 1}${L.course ? " · " + L.course : ""}`,
+      footer: `Lesson ${i + 1} · ${L.title}`, sections, dialog: L.dialog,
+    };
+  });
+}
+let WS_ALL = WORKSHEETS;
+
+const wsBoxes = zh => [...wsStrip(zh)].map(c => `<div class="ws-box"><span>${c}</span></div>`).join("");
+
 function wsRender() {
-  const i = +(settings.ws || 0), W = WORKSHEETS[i] || WORKSHEETS[0];
+  const W = WS_ALL[+(settings.ws || 0)] || WS_ALL[0];
   $("#wsSheet").innerHTML = `
     <header class="ws-head">
       <div><h1>${W.title}</h1><span class="ws-hz">${W.zh} ${W.py}</span></div>
       <div class="ws-meta">Name: <span></span><br>Date: <span></span></div>
     </header>
-    ${W.sections.map(([t, hz, words]) => `
+    ${W.sections.map(([t, hz, words, cols]) => `
       <h2 class="ws-h2">${t} <b>${hz}</b></h2>
-      <div class="ws-grid" style="--cols:${words.length}">
-        ${words.map(([pic, zh, py, en]) => `
+      <div class="ws-grid${cols === 2 ? " ws-phr" : cols >= 6 ? " ws-w6" : ""}" style="--cols:${cols || words.length}">
+        ${words.map(([pic, zh, py, en]) => cols === 2 ? `
+          <div class="ws-card" data-zh="${zh}" title="Tap to hear">
+            <div class="ws-row"><div class="ws-pic">${pic}</div><div class="ws-chars">${wsBoxes(zh)}</div></div>
+            <div class="ws-py">${py}</div>
+            <div class="ws-en">${en}</div>
+          </div>` : `
           <div class="ws-card" data-zh="${zh}" title="Tap to hear">
             <div class="ws-pic">${pic}</div>
-            <div class="ws-chars">${[...zh].map(c => `<div class="ws-box"><span>${c}</span></div>`).join("")}</div>
+            <div class="ws-chars">${wsBoxes(zh)}</div>
             <div class="ws-py">${py}</div>
             <div class="ws-en">${en}</div>
           </div>`).join("")}
       </div>`).join("")}
+    ${W.dialog ? `
+      <h2 class="ws-h2">Dialogue <b>对话</b></h2>
+      <p class="ws-scene">🎬 ${W.dialog.scene}</p>
+      <div class="ws-dlg">${W.dialog.lines.map(l => `
+        <div class="ws-line" data-zh="${l.zh}"><span class="ws-who ws-${l.who}">${l.who}</span>
+          <div><span class="ws-lzh">${l.zh}</span><span class="ws-lpy">${wsPy(l.py)}</span><span class="ws-len">${l.en}</span></div></div>`).join("")}
+      </div>` : ""}
     ${W.tip ? `<div class="ws-tip"><div class="ws-big">${W.tip[0]}</div><div>${W.tip[1]}</div></div>` : ""}
     <footer class="ws-foot">拼音 Tone Trainer · ${W.footer}</footer>`;
-  $("#wsSheet").querySelectorAll(".ws-card").forEach(c => (c.onclick = () => { unlockAudio(); speak(c.dataset.zh); }));
+  $("#wsSheet").querySelectorAll("[data-zh]").forEach(c => (c.onclick = () => { unlockAudio(); speak(c.dataset.zh); }));
   wsFit();
 }
 
-/* Scale the fixed-size A4 sheet down to fit narrow screens. */
+/* Scale the A4 sheet down to fit narrow screens. */
 function wsFit() {
   const wrap = $("#wsWrap"), sheet = $("#wsSheet");
   if (!wrap.offsetWidth) return;
@@ -77,8 +113,9 @@ function wsFit() {
 }
 
 function wsInit() {
+  WS_ALL = [...WORKSHEETS, ...wsLessonSheets()];
   const pick = $("#wsPick");
-  pick.innerHTML = WORKSHEETS.map((w, i) => `<option value="${i}">${w.title} ${w.zh}</option>`).join("");
+  pick.innerHTML = WS_ALL.map((w, i) => `<option value="${i}">${i ? `${w.footer}` : `${w.title} ${w.zh}`}</option>`).join("");
   pick.value = settings.ws || 0;
   pick.onchange = () => { settings.ws = pick.value; save(); wsRender(); };
   $("#wsPrint").onclick = () => {
