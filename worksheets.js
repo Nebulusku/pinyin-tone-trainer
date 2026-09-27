@@ -1,7 +1,7 @@
 /* Printable A4 worksheets: 汉字 in practice boxes with pinyin, English and a picture. Tap a word to hear it. */
 const WORKSHEETS = [
   {
-    lesson: 0, // extra sheet shown with this lesson
+    lesson: 0, // replaces the generated summary for this lesson
     title: "Greetings", zh: "问候", py: "wèn hòu", footer: "Lesson 1 · Greetings",
     sections: [
       ["Saying hello", "打招呼", [
@@ -58,8 +58,11 @@ function wsLessonSheet(i) {
   sections.push(["Key phrases", "句子", L.phrases.map(item), 2]);
   return { title: L.title, zh: lessonLabel(i), py: "", footer: `Lesson ${i + 1} · ${L.title}`, sections, dialog: L.dialog };
 }
-/* Sheets for the lesson chosen in the shared selector: its own sheet plus any extra sheets for it. */
-const wsSheets = () => [wsLessonSheet(tabDay("sheets")), ...WORKSHEETS.filter(w => w.lesson === tabDay("sheets"))];
+/* Summary for the lesson chosen in the selector: a hand-made sheet when there is one (e.g. Greetings for lesson 1), else one built from the lesson. */
+const wsSheets = () => {
+  const i = tabDay("sheets"), own = WORKSHEETS.filter(w => w.lesson === i);
+  return own.length ? own : [wsLessonSheet(i)];
+};
 let wsWhich = 0, wsDay = -1;
 
 const wsBoxes = zh => [...wsStrip(zh)].map(c => `<div class="ws-box"><span>${c}</span></div>`).join("");
