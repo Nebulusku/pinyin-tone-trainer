@@ -414,15 +414,18 @@ function onRemoteMerge() {
   if (!dialogRun && !$("#tab-lesson").hidden) renderDay();
   if (fcStarted) $("#fcCount").textContent = fcStats();
 }
-let fcStarted = false;
+let fcStarted = false, wsStarted = false;
 document.querySelectorAll(".tabs [data-tab]").forEach(b => (b.onclick = () => {
   stopDialog();
   stopSpeech();
   document.querySelectorAll(".tabs [data-tab]").forEach(x => x.classList.toggle("sel", x === b));
   $("#tab-lesson").hidden = b.dataset.tab !== "lesson";
   $("#tab-cards").hidden = b.dataset.tab !== "cards";
-  if (b.dataset.tab === "cards") $("#calPanel").classList.remove("open");
+  $("#tab-sheets").hidden = b.dataset.tab !== "sheets";
+  $(".bar").hidden = b.dataset.tab === "sheets";
+  if (b.dataset.tab !== "lesson") $("#calPanel").classList.remove("open");
   if (b.dataset.tab === "cards" && !fcStarted) { fcStarted = true; fcInit(); }
+  if (b.dataset.tab === "sheets") { if (!wsStarted) { wsStarted = true; wsInit(); } else wsFit(); }
 }));
 if (window.AUDIO_FILES) $("#voice").parentElement.style.display = "none";
 else if ("speechSynthesis" in window) { refreshVoices(); speechSynthesis.onvoiceschanged = refreshVoices; }
