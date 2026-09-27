@@ -1,6 +1,6 @@
 {
-  "name": "Pinyin Tone Trainer",
-  "short_name": "Tones",
+  "name": "Easy Chinese",
+  "short_name": "Easy Chinese",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

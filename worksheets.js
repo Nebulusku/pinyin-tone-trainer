@@ -100,7 +100,7 @@ function wsRender() {
           <div><span class="ws-lzh">${l.zh}</span><span class="ws-lpy">${wsPy(l.py)}</span><span class="ws-len">${l.en}</span></div></div>`).join("")}
       </div>` : ""}
     ${W.tip ? `<div class="ws-tip"><div class="ws-big">${W.tip[0]}</div><div>${W.tip[1]}</div></div>` : ""}
-    <footer class="ws-foot">拼音 Tone Trainer · ${W.footer}</footer>`;
+    <footer class="ws-foot">Easy Chinese · ${W.footer}</footer>`;
   $("#wsSheet").querySelectorAll("[data-zh]").forEach(c => (c.onclick = () => { unlockAudio(); speak(c.dataset.zh); }));
   wsFit();
 }

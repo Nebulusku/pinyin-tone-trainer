@@ -72,7 +72,7 @@ const Auth = (() => {
       return;
     }
     if (!cfg()) {
-      $("#lockForm").innerHTML = `<h2>拼音 Tone Trainer</h2><p class="note">No login has been set up yet. On the Mac, run <code>node tools/set-login.js</code> in the app folder.</p>`;
+      $("#lockForm").innerHTML = `<h2>Easy Chinese</h2><p class="note">No login has been set up yet. On the Mac, run <code>node tools/set-login.js</code> in the app folder.</p>`;
       return;
     }
     if (!(window.crypto && crypto.subtle)) {
