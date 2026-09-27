@@ -138,13 +138,15 @@ function practiceCard(item, { id, who, isMe } = {}) {
   if (!chars) console.warn("Hanzi/pinyin mismatch:", item.zh, item.py);
   const el = document.createElement("div");
   el.className = "card";
+  const pic = !who && typeof WS_PICS !== "undefined" && WS_PICS[item.zh.replace(/[，。？！、,.?!…—\s]/g, "")];
   const pyHtml = parsed.words.map((w, wi) =>
     `<span class="p">${w.pre}</span><span class="w" data-w="${wi}">` +
     w.syls.map(s => `<span class="s t${s.tone}${s.sandhi ? " sandhi" : ""}"${s.sandhi ? ' title="3rd tone before another 3rd tone: say it as 2nd"' : ""}>${s.text}</span>`).join("") +
     `</span><span class="p">${w.post}</span>`).join(" ");
   el.innerHTML =
-    (who ? `<span class="who${isMe ? " me" : ""}">${who === "A" ? "Person 1" : "Person 2"}${isMe ? " · you" : ""}</span>` : "") +
-    `<div class="py">${pyHtml}</div><div class="zh">${item.zh}</div><div class="en">${item.en}</div>
+    (who ? `<span class="who who-${who}${isMe ? " me" : ""}">${who === "A" ? "Person 1" : "Person 2"}${isMe ? " · you" : ""}</span>` : "") +
+    (pic ? `<span class="pic">${pic}</span>` : "") +
+    `<div class="py">${pyHtml}</div><div class="zh">${[...item.zh].map(c => /[，。？！、,.?!…—\s]/.test(c) ? "" : `<span class="hz">${c}</span>`).join("")}</div><div class="en">${item.en}</div>
      <div class="actions">
        <button class="play">🔊 Listen</button><button class="slow">🐢 Slow</button>
        <button class="rec">🎙 Record</button><span class="level"><i></i></span>
