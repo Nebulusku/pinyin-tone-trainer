@@ -137,6 +137,12 @@ body.show-zh .zh { display: flex; }
 .who-B { background: var(--red); }
 .who.me { background: var(--yellow); color: var(--accent); }
 .fc.hide-en .pic { display: none; }
+/* Pinyin in sheet blue (no tone colours), English in sheet red */
+.py { font-weight: 800; }
+.py .s, .legend .s { color: var(--accent) !important; }
+.py .s.t5 { font-weight: 600; }
+.s.sandhi { text-decoration-color: var(--accent); }
+.fc.hide-py .en { color: var(--red); }
 .fc .fc-prompt { padding-right: 44px; }
 .seg { background: #fff; }
 .seg button.sel, button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
