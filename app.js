@@ -275,6 +275,8 @@ function bumpStreak() {
 const showStreak = () => ($("#streak").textContent = state.streak && state.lastPractice >= dayStr(new Date(Date.now() - 864e5)) ? `${state.streak}-day streak` : "");
 
 /* ---------- Lesson rendering ---------- */
+let curTab = "lesson"; // which tab is showing: lesson | cards | sheets
+const tabDay = t => t === "lesson" ? day : Math.min(+(settings[t + "Day"] ?? day), LESSONS.length - 1);
 const ZH_DIGITS = "零一二三四五六七八九";
 const zhNum = n => n <= 10 ? (n === 10 ? "十" : ZH_DIGITS[n]) : n < 20 ? "十" + (n % 10 ? ZH_DIGITS[n % 10] : "") : ZH_DIGITS[Math.floor(n / 10)] + "十" + (n % 10 ? ZH_DIGITS[n % 10] : "");
 /* Header line shared by all tabs and the worksheets: 第十六课 Lesson 16 · HSK 1 */
@@ -285,9 +287,7 @@ function renderDay() {
   stopDialog();
   if (day > (state.maxDay || 0)) { state.maxDay = day; save(); }
   const L = LESSONS[day];
-  $("#dayLabel").textContent = `${lessonLabel(day)}${day === todayIndex() ? " · up next" : ""}`;
-  $("#dayTitle").textContent = L.title;
-  $("#lessonPick").value = day;
+  if (curTab === "lesson") showHeader();
   updateProgress();
   const wb = $("#words"), words = L.words || [];
   wb.innerHTML = "";
@@ -386,7 +386,7 @@ function setupCalibration() {
 function refreshPicker() {
   $("#lessonPick").innerHTML = LESSONS.map((L, i) =>
     `<option value="${i}">${(state.completed || {})[i] ? "✓ " : ""}Lesson ${i + 1} · ${L.title}</option>`).join("");
-  $("#lessonPick").value = day;
+  showHeader();
 }
 function updateProgress() {
   const p = lessonProgress(day);
@@ -399,17 +399,27 @@ function updateProgress() {
     : `${p.done} of ${p.total} done`;
 }
 refreshPicker();
-/* One lesson selector for all tabs: Lesson, Cards and Sheets all follow `day`. */
+/* The lesson selector sits above all tabs, but each tab keeps its own lesson (Lesson uses `day`). */
+function showHeader() {
+  const i = tabDay(curTab);
+  $("#dayLabel").textContent = `${lessonLabel(i)}${i === todayIndex() ? " · up next" : ""}`;
+  $("#dayTitle").textContent = LESSONS[i].title;
+  $("#lessonPick").value = i;
+}
 function setDay(n) {
   stopSpeech();
-  day = (n + LESSONS.length) % LESSONS.length;
-  renderDay();
-  if (fcStarted) fcStart();
-  if (wsStarted) wsRender();
+  n = (n + LESSONS.length) % LESSONS.length;
+  if (curTab === "lesson") { day = n; renderDay(); }
+  else {
+    settings[curTab + "Day"] = n;
+    save();
+    if (curTab === "cards") fcStart(); else wsRender();
+  }
+  showHeader();
 }
 $("#lessonPick").onchange = e => setDay(+e.target.value);
-$("#prevDay").onclick = () => setDay(day - 1);
-$("#nextDay").onclick = () => setDay(day + 1);
+$("#prevDay").onclick = () => setDay(tabDay(curTab) - 1);
+$("#nextDay").onclick = () => setDay(tabDay(curTab) + 1);
 $("#rate").value = settings.rate;
 $("#rate").oninput = e => { settings.rate = +e.target.value; save(); };
 $("#showZh").checked = settings.showZh;
@@ -437,6 +447,8 @@ document.querySelectorAll(".tabs [data-tab]").forEach(b => (b.onclick = () => {
   if (b.dataset.tab !== "lesson") $("#calPanel").classList.remove("open");
   if (b.dataset.tab === "cards" && !fcStarted) { fcStarted = true; fcInit(); }
   if (b.dataset.tab === "sheets") { if (!wsStarted) { wsStarted = true; wsInit(); } else wsFit(); }
+  curTab = b.dataset.tab;
+  showHeader();
 }));
 if (window.AUDIO_FILES) $("#voice").parentElement.style.display = "none";
 else if ("speechSynthesis" in window) { refreshVoices(); speechSynthesis.onvoiceschanged = refreshVoices; }

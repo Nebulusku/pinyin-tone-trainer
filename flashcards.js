@@ -7,7 +7,7 @@ const addDays = (d, n) => { const x = new Date(d + "T12:00:00"); x.setDate(x.get
 
 /* Words, phrases + dialogue lines of the lesson chosen in the shared lesson selector, without duplicates. */
 function fcDeck() {
-  const L = LESSONS[day], seen = new Set(), deck = [];
+  const L = LESSONS[tabDay("cards")], seen = new Set(), deck = [];
   [...(L.words || []), ...L.phrases, ...L.dialog.lines].forEach(it => {
     if (!seen.has(it.zh)) { seen.add(it.zh); deck.push(it); }
   });

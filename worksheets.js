@@ -59,14 +59,14 @@ function wsLessonSheet(i) {
   return { title: L.title, zh: lessonLabel(i), py: "", footer: `Lesson ${i + 1} · ${L.title}`, sections, dialog: L.dialog };
 }
 /* Sheets for the lesson chosen in the shared selector: its own sheet plus any extra sheets for it. */
-const wsSheets = () => [wsLessonSheet(day), ...WORKSHEETS.filter(w => w.lesson === day)];
+const wsSheets = () => [wsLessonSheet(tabDay("sheets")), ...WORKSHEETS.filter(w => w.lesson === tabDay("sheets"))];
 let wsWhich = 0, wsDay = -1;
 
 const wsBoxes = zh => [...wsStrip(zh)].map(c => `<div class="ws-box"><span>${c}</span></div>`).join("");
 
 function wsRender() {
   const all = wsSheets();
-  if (wsDay !== day || wsWhich >= all.length) { wsWhich = 0; wsDay = day; }
+  if (wsDay !== tabDay("sheets") || wsWhich >= all.length) { wsWhich = 0; wsDay = tabDay("sheets"); }
   const W = all[wsWhich], seg = $("#wsWhich");
   seg.hidden = all.length < 2;
   seg.innerHTML = all.map((w, k) => `<button data-k="${k}" class="${k === wsWhich ? "sel" : ""}">${k ? w.title : "Lesson sheet"}</button>`).join("");

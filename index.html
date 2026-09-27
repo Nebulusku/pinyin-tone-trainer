@@ -339,6 +339,14 @@ body.show-zh .zh { display: flex; }
 <script src="worksheets.js"></script>
 <script src="sync.js"></script>
 <script src="auth.js"></script>
-<script>if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js");</script>
+<script>
+/* Offline support. A new version is fetched on every open and, once it takes over, the page reloads once to show it. */
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(r => r.update()).catch(() => {});
+}
+</script>
 </body>
 </html>
