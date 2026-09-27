@@ -405,6 +405,7 @@ function showHeader() {
   $("#dayLabel").textContent = `${lessonLabel(i)}${i === todayIndex() ? " · up next" : ""}`;
   $("#dayTitle").textContent = LESSONS[i].title;
   $("#lessonPick").value = i;
+  $("#lessonTitle").hidden = curTab === "sheets"; // the summary sheet has its own title
 }
 function setDay(n) {
   stopSpeech();

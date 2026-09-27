@@ -117,10 +117,13 @@ button { font-weight: 700; background: #fff; }
 .tabs button.sel { background: var(--yellow); color: var(--accent); border-color: #e9c233; }
 .bar, .panel, #lock form { box-shadow: 0 2px 8px rgba(30,42,58,.06); }
 .daynav h2 { font-weight: 800; color: var(--accent); }
-.lhead { display: flex; align-items: center; gap: 10px; margin: 16px 0 8px; }
-.lhead-mid { flex: 1; text-align: center; min-width: 0; }
-.lhead h2 { display: inline-block; margin: 0; font-size: 1.35rem; font-weight: 800; line-height: 1.3; color: var(--accent); background: var(--yellow); padding: 1px 12px; border-radius: 6px; transform: rotate(-1.2deg); }
-.lhead-sub { display: block; margin-top: 6px; font-family: "Noto Serif SC", "Songti SC", serif; font-size: 1.05rem; color: var(--red); }
+.lsel { display: flex; align-items: center; gap: 8px; margin: 14px 0 10px; }
+.lsel select { flex: 1; min-width: 0; font: inherit; font-weight: 700; padding: 7px 10px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); }
+.lsel button { flex-shrink: 0; width: 40px; height: 40px; padding: 0; font-size: 1.2rem; }
+/* Lesson name like the worksheet header: yellow highlighter, blue title, red lesson line */
+.ltitle { margin: 16px 0 6px; }
+.ltitle h2 { display: inline-block; margin: 0; font-size: 1.7rem; font-weight: 800; line-height: 1.25; color: var(--accent); background: var(--yellow); padding: 1px 14px; border-radius: 6px; transform: rotate(-1.2deg); }
+.ltitle-sub { display: block; margin: 8px 0 0 12px; font-family: "Noto Serif SC", "Songti SC", serif; font-size: 1.3rem; color: var(--red); }
 .daynav .day { color: var(--red); text-transform: uppercase; letter-spacing: .08em; font-size: .75rem; font-weight: 800; }
 h3 { font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; color: var(--red); display: flex; align-items: center; gap: 8px; }
 h3::after { content: ""; flex: 1; border-bottom: 1.5px dashed var(--red); }
@@ -243,15 +246,11 @@ body.show-zh .zh { display: flex; }
     <button id="signOut">Sign out</button>
   </nav>
 
-  <div class="lhead">
+  <div class="lsel">
     <button id="prevDay" aria-label="Previous lesson">‹</button>
-    <div class="lhead-mid">
-      <h2 id="dayTitle"></h2>
-      <span class="lhead-sub" id="dayLabel"></span>
-    </div>
+    <select id="lessonPick" aria-label="Choose lesson"></select>
     <button id="nextDay" aria-label="Next lesson">›</button>
   </div>
-  <div class="pick"><select id="lessonPick" aria-label="Jump to lesson"></select></div>
 
   <div class="bar">
     <label>Voice <select id="voice"></select></label>
@@ -266,6 +265,11 @@ body.show-zh .zh { display: flex; }
     <p class="note">Say the four tones slowly with a short pause between each. This teaches the app where your high and low pitch are, which makes 1st vs 3rd tone detection much more reliable.</p>
     <div id="calSlot"></div>
     <p class="note" id="calStatus"></p>
+  </div>
+
+  <div class="ltitle" id="lessonTitle">
+    <h2 id="dayTitle"></h2>
+    <span class="ltitle-sub" id="dayLabel"></span>
   </div>
 
   <section id="tab-cards" hidden>
