@@ -68,7 +68,12 @@ let WS_ALL = WORKSHEETS;
 const wsBoxes = zh => [...wsStrip(zh)].map(c => `<div class="ws-box"><span>${c}</span></div>`).join("");
 
 function wsRender() {
-  const W = WS_ALL[+(settings.ws || 0)] || WS_ALL[0];
+  const n = Math.min(+(settings.ws || 0), WS_ALL.length - 1), W = WS_ALL[n];
+  $("#wsPick").value = n;
+  $("#wsCount").textContent = `Sheet ${n + 1} of ${WS_ALL.length}`;
+  $("#wsTitle").textContent = n ? `${W.footer}` : W.title;
+  $("#wsPrev").disabled = n === 0;
+  $("#wsNext").disabled = n === WS_ALL.length - 1;
   $("#wsSheet").innerHTML = `
     <header class="ws-head">
       <div><h1>${W.title}</h1><span class="ws-hz">${W.zh} ${W.py}</span></div>
@@ -116,8 +121,10 @@ function wsInit() {
   WS_ALL = [...WORKSHEETS, ...wsLessonSheets()];
   const pick = $("#wsPick");
   pick.innerHTML = WS_ALL.map((w, i) => `<option value="${i}">${i ? `${w.footer}` : `${w.title} ${w.zh}`}</option>`).join("");
-  pick.value = settings.ws || 0;
-  pick.onchange = () => { settings.ws = pick.value; save(); wsRender(); };
+  const go = n => { settings.ws = String(Math.max(0, Math.min(WS_ALL.length - 1, n))); save(); stopSpeech(); wsRender(); };
+  pick.onchange = () => go(+pick.value);
+  $("#wsPrev").onclick = () => go(+(settings.ws || 0) - 1);
+  $("#wsNext").onclick = () => go(+(settings.ws || 0) + 1);
   $("#wsPrint").onclick = () => {
     document.body.classList.add("print-ws");
     window.print();

@@ -225,11 +225,16 @@ body.show-zh .zh { display: block; }
   </section>
 
   <section id="tab-sheets" hidden>
-    <div class="dialog-bar">
-      <select id="wsPick" aria-label="Worksheet"></select>
-      <button class="primary" id="wsPrint">🖨 Print A4</button>
-      <span class="note">Tap a word to hear it.</span>
+    <div class="daynav">
+      <button id="wsPrev" aria-label="Previous sheet">‹</button>
+      <h2><span class="day" id="wsCount"></span><span id="wsTitle"></span></h2>
+      <button id="wsNext" aria-label="Next sheet">›</button>
     </div>
+    <div class="dialog-bar" style="justify-content:center">
+      <select id="wsPick" aria-label="Jump to sheet"></select>
+      <button class="primary" id="wsPrint">🖨 Print A4</button>
+    </div>
+    <p class="note" style="text-align:center;margin:-4px 0 10px">Tap a word to hear it · ‹ › for the other lessons</p>
     <div id="wsWrap"><div id="wsSheet"></div></div>
   </section>
 

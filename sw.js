@@ -1,5 +1,5 @@
 /* Offline cache: app files load fresh when online (cache is the offline fallback); audio clips are cached permanently. */
-const VERSION = "ptt-v17";
+const VERSION = "ptt-v18";
 const SHELL = ["./", "index.html", "app.js", "supabase-config.js", "login.js", "sync.js", "auth.js", "flashcards.js", "worksheet-pics.js", "worksheets.js", "tone-model.js", "tone-engine.js", "lessons.js", "lessons-hsk1.js", "audio/manifest.js", "manifest.webmanifest", "icons/icon-192.png"];
 
 self.addEventListener("install", e => {
